@@ -94,8 +94,8 @@
 - Eventos híbridos regulares por comunidade
 - Primeiro funcionário (community manager)
 
-### Fase 4: Copa (10.000+ jogadores) 🌲
-**Objetivo**: Escala multi-comunidade nacional
+### Fase 4: Florescimento (10.000+ jogadores) 🌲
+**Objetivo**: Abrir para mais comunidades e cidades
 
 - Plataforma aberta: qualquer comunidade pode criar seu "mundo"
 - API aberta para empreendimentos criarem próprias missões

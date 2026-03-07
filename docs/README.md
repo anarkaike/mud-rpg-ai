@@ -20,7 +20,8 @@ docs/
 │   ├── 02_GAMEPLAY_E_MECANICAS.md      ← [Ciclo de Jogo e Experiência](./desktop/02_GAMEPLAY_E_MECANICAS.md)
 │   ├── 03_ARQUITETURA_TECNICA.md       ← [N8N, IA, Dados, Fluxos](./desktop/03_ARQUITETURA_TECNICA.md)
 │   ├── 04_MONETIZACAO_E_CRESCIMENTO.md ← [Modelos B2B/B2C, Fases](./desktop/04_MONETIZACAO_E_CRESCIMENTO.md)
-│   └── 05_PITCH_RESUMO.md              ← [Pitch Comercial/Apresentação](./desktop/05_PITCH_RESUMO.md)
+│   ├── 05_PITCH_RESUMO.md              ← [Pitch Comercial/Apresentação](./desktop/05_PITCH_RESUMO.md)
+│   └── 06_ECONOMIA_SALAS_IDENTIDADE.md ← [Economia, Salas e Avatares](./desktop/06_ECONOMIA_SALAS_IDENTIDADE.md)
 ```
 
 ## 🎯 O que é este Projeto?
@@ -30,7 +31,7 @@ Um agente de IA (via N8N) que transforma uma conversa pelo WhatsApp em um **[MUD
 - **Jogadores interagem por texto** (WhatsApp) com um mundo persistente mediado por IA
 - **QR Codes em locais físicos** (bares, eventos, empreendimentos) destravam conteúdo no jogo
 - **Jogadores interagem entre si** no mundo real e no virtual, trocando códigos e colaborando
-- **A IA é mediadora consciente**: reformula textos, facilita conexões, expande consciência
+- **A IA é mediadora**: reformula textos, facilita conexões, propõe reflexões
 
 ## Contexto
 
@@ -38,8 +39,8 @@ O projeto nasce com o objetivo de:
 
 1. **Conectar comunidades** de forma profunda e significativa
 2. **Fortalecer empreendimentos locais** (bares, eventos, negócios)
-3. **Expandir consciência** individual e coletiva através do jogo
-4. **Ser a nova era da "sala de bate papo"** — simples, orgânico, escalável, textual, mental (menos aparência, mais essência)
+3. **Facilitar reflexão** e autoconhecimento através do jogo
+4. **Resgatar a simplicidade do bate-papo** — textual, mental, sem fricção (menos aparência, mais essência)
 
 > **Lançamento**: A primeira comunidade será a LGBTQIA+ (via rede Guia Gay), mas a plataforma é projetada para escalar para **qualquer comunidade** que valorize conexão por essência.
 

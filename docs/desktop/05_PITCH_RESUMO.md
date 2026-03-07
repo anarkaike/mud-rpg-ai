@@ -1,7 +1,7 @@
 # 🎤 Pitch Resumo — MUD-AI
 
 <div align="center">
-  [◀ Monetização e Crescimento](./04_MONETIZACAO_E_CRESCIMENTO.md) | <strong>Pitch Resumo</strong>
+  [◀ Monetização e Crescimento](./04_MONETIZACAO_E_CRESCIMENTO.md) | <strong>Pitch Resumo</strong> | [Economia & Salas ▶](./06_ECONOMIA_SALAS_IDENTIDADE.md)
 </div>
 
 > Para apresentações rápidas a parceiros, investidores e comunidade.
@@ -30,7 +30,7 @@
 Um **[MUD (Multi-User Dungeon)](../PESQUISA_MUDS.md)** reinventado para a era da IA:
 
 🎮 **É um jogo** — [RPG textual jogado pelo WhatsApp](../README.md), sem instalar nada
-🤖 **IA como Game Master** — Cria narrativas, media conexões, expande consciência
+🤖 **IA como Game Master** — Cria narrativas, facilita conexões, propõe reflexões
 📍 **Mundo real integrado** — QR Codes em locais reais destravam conteúdo e missões
 🧱 **Construído pelos jogadores** — Como Minecraft: cada história cria o mundo
 🤝 **Banco de trocas** — Conecta habilidades (quem oferece ↔ quem precisa)
@@ -55,12 +55,12 @@ Um **[MUD (Multi-User Dungeon)](../PESQUISA_MUDS.md)** reinventado para a era da
 
 ## Os Potenciais
 
-✨ **Conexões profundas** entre essências e histórias — redes de cura, mentoria e projetos
-🧠 **Consciência expandida** ao reformular narrativas, reconhecer padrões, experimentar
-🏙️ **Engajamento urbano** que transforma bares em palcos do RPG
-💪 **Comunidade fortalecida** via trocas reais de conhecimento e apoio
-📖 **Narrativa viva** que inspira e atrai quem busca propósito e pertencimento
-🌱 **Crescimento orgânico** — semente que cresce com os próprios jogadores
+✨ **Conexões reais** entre pessoas com histórias e interesses que se complementam
+🧠 **Reflexão natural** ao participar de rituais, cartas e conversas mediadas
+🏙️ **Exploração urbana** que transforma locais do dia-a-dia em cenários do jogo
+💪 **Comunidade próxima** via trocas reais de conhecimento e apoio
+📖 **Histórias que crescem** e atraem quem busca pertencimento
+🌱 **Crescimento orgânico** — começa pequeno, cresce com os jogadores
 
 ---
 
@@ -100,12 +100,12 @@ Eventos e festivais narrativos (B2C/B2B)
 
 ---
 
-> _"Não é um app. Não é uma rede social. É uma **experiência viva** que conecta, cura, inspira e fortalece — uma mensagem de cada vez."_
+> _"Não é um app. Não é uma rede social. É um jogo simples que aproxima pessoas de verdade — uma mensagem de cada vez."_
 
 ---
 
 <div align="center">
-  [◀ Monetização e Crescimento](./04_MONETIZACAO_E_CRESCIMENTO.md) | [🏠 Início](../README.md)
+  [◀ Monetização e Crescimento](./04_MONETIZACAO_E_CRESCIMENTO.md) | [🏠 Início](../README.md) | [Economia & Salas ▶](./06_ECONOMIA_SALAS_IDENTIDADE.md)
 </div>
 
 *Pitch v1 — Março/2026*

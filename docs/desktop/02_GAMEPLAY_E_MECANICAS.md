@@ -81,13 +81,13 @@ A IA atua como intermediária em TODA comunicação:
 
 ### Como os Jogadores Criam o Mundo
 
-> O universo nasce da interação — cada texto, história, reflexão é um "bloco".
+> O mundo cresce a partir das interações — cada texto, história ou reflexão é um "bloco" que se soma ao mapa.
 
 1. **Fragmentos narrativos**: Jogador escreve um trecho (história, sensação, descrição de local) → IA transforma em "bloco" no mapa
 2. **Crafting narrativo**: Combinar blocos de diferentes jogadores cria novos locais/eventos
    - _1 insight de autoconhecimento + 1 bar + 1 habilidade = 1 checkpoint_
 3. **Conexão por similaridade**: IA sugere links entre blocos de jogadores diferentes
-4. **Mapa vivo**: O mundo se expande a cada contribuição
+4. **Mapa que cresce**: O mundo se expande a cada contribuição dos jogadores
 
 ### Regras de Construção
 - Qualquer jogador pode criar blocos narrativos

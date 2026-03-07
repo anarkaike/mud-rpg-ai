@@ -8,9 +8,9 @@
 
 ---
 
-## A Grande Ideia
+## A Proposta
 
-> _"A nova era da sala de bate papo da UOL"_ — simples, orgânico, escalável. Uma semente que cresce com os próprios jogadores.
+> _"Uma nova forma de bate papo"_ — simples, orgânico, escalável, textual e mental. Uma semente que cresce com os próprios jogadores. Um mundo que se expande com as histórias e ações dos jogadores, moldado pela imaginação e essência de cada um em mescla com a comunidade, como cores no pintar e esculpir de uma obra de arte.
 
 Um **RPG textual via WhatsApp**, mediado por IA, que conecta **qualquer comunidade** de forma profunda — através de **texto, consciência, histórias e ação no mundo real**.
 
@@ -25,11 +25,11 @@ Um **RPG textual via WhatsApp**, mediado por IA, que conecta **qualquer comunida
 - O texto revela o interior: anseios, sonhos, feridas, potenciais
 - "Uma pessoa pode ser a cura da outra"
 
-### 2. 🧠 Expansão da Consciência
-- Estimular partilha do interior (passado, futuro, ansiedades, sonhos)
-- Reformulação de narrativas pessoais pela IA
-- Rituais de autoconhecimento integrados ao gameplay
-- Mentoria de consciência (gatilhos, técnicas, perspectivas)
+### 2. 🧠 Autoconhecimento pelo Jogo
+- Estimular partilha do que carregamos por dentro (passado, futuro, ansiedades, sonhos)
+- A IA ajuda a reformular narrativas pessoais
+- Rituais de reflexão integrados ao gameplay
+- Mentoria orgânica (perspectivas, técnicas, escuta)
 
 ### 3. 🏙️ Exploração do Mundo Real
 - QR Codes em empreendimentos, espaços e eventos = portais do jogo
@@ -43,8 +43,8 @@ Um **RPG textual via WhatsApp**, mediado por IA, que conecta **qualquer comunida
 - Network profissional orgânico (conecta com a [Monetização](./04_MONETIZACAO_E_CRESCIMENTO.md))
 
 ### 5. 🎮 Diversão com Propósito
-- Não é "gamificação" — é um JOGO de verdade, mas com impacto real
-- Diversão + Amor + Autoconhecimento + Comunidade + Network (veja os [Tipos de Missões](./02_GAMEPLAY_E_MECANICAS.md))
+- Não é "gamificação corporativa" — é um jogo de verdade, mas com algo a mais
+- Diversão + Reflexão + Comunidade + Network (veja os [Tipos de Missões](./02_GAMEPLAY_E_MECANICAS.md))
 
 ---
 
@@ -111,7 +111,7 @@ O jogo deve ser desenhado para acolher **diferentes formas de se estar no mundo*
 
 ---
 
-## Valores Inegociáveis
+## Valores que nos guiam
 
 1. **Segurança** — Espaço acolhedor e livre de discriminação
 2. **Autenticidade** — Texto como ponte para o real, não para o fake

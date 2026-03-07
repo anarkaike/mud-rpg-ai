@@ -92,9 +92,9 @@
 
 ---
 
-## 4. Nossa Posição Única
+## 4. O que tentamos combinar
 
-> **Nenhum MUD existente combina TUDO isso:**
+> Nenhum projeto que encontramos combina todos esses elementos:
 
 ```
 MUD Clássico     → Mundo de salas + multiplayer + texto
@@ -105,7 +105,7 @@ WhatsApp         → Interface universal, sem fricção
     +
 Mundo Real       → QR Codes + empreendimentos + tours urbanos
     +
-Propósito Social → Comunidades diversas + consciência + network
+Propósito Social → Comunidades + reflexão + network
     +
 Construção Emergente → Jogadores criam o mundo
     +
@@ -118,7 +118,7 @@ Multi-Comunidade → Escalável para qualquer grupo humano
 2. **Público definido**: Lançamento com comunidade LGBTQIA+ (Guia Gay), expansível para qualquer comunidade
 3. **Ponte real-virtual**: QR Codes transformam locais em portais do jogo
 4. **IA como diferencial**: Não é um MUD com IA "colada", a IA É o jogo
-5. **Propósito**: Vai além de "jogar" — conecta, cura, fortalece
+5. **Propósito**: Vai além de "jogar" — conecta, aproxima, fortalece
 6. **Arquitetura multi-comunidade**: Cada comunidade pode ter seu "mundo" com identidade própria, mas com portais para os outros
 
 ---
