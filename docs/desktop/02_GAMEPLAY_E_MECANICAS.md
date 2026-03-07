@@ -1,8 +1,8 @@
 # 🎮 Gameplay e Mecânicas — MUD-AI
 
-<div align="center">
-  [◀ Visão e Conceito](./01_VISAO_E_CONCEITO.md) | <strong>Gameplay</strong> | [Arquitetura Técnica ▶](./03_ARQUITETURA_TECNICA.md)
-</div>
+<p align="center">
+  <a href="./01_VISAO_E_CONCEITO.md">◀ Visão e Conceito</a> | <b>Gameplay</b> | <a href="./03_ARQUITETURA_TECNICA.md">Arquitetura Técnica ▶</a>
+</p>
 
 > **Mesa de trabalho** — Rascunho vivo de mecânicas de jogo em amadurecimento.
 
@@ -190,8 +190,8 @@ Deck digital de cartas que provocam reflexão e ação:
 
 ---
 
-<div align="center">
-  [◀ Visão e Conceito](./01_VISAO_E_CONCEITO.md) | [🏠 Início](../README.md) | [Arquitetura Técnica ▶](./03_ARQUITETURA_TECNICA.md)
-</div>
+<p align="center">
+  <a href="./01_VISAO_E_CONCEITO.md">◀ Visão e Conceito</a> | <a href="../README.md">🏠 Início</a> | <a href="./03_ARQUITETURA_TECNICA.md">Arquitetura Técnica ▶</a>
+</p>
 
 *Rascunho de trabalho — Iterar conforme testamos conceitos — Março/2026*

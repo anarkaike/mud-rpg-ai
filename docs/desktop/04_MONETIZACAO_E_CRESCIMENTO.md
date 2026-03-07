@@ -1,8 +1,8 @@
 # 💰 Monetização e Crescimento — MUD-AI
 
-<div align="center">
-  [◀ Arquitetura Técnica](./03_ARQUITETURA_TECNICA.md) | <strong>Monetização</strong> | [Pitch Resumo ▶](./05_PITCH_RESUMO.md)
-</div>
+<p align="center">
+  <a href="./03_ARQUITETURA_TECNICA.md">◀ Arquitetura Técnica</a> | <b>Monetização</b> | <a href="./05_PITCH_RESUMO.md">Pitch Resumo ▶</a>
+</p>
 
 > **Mesa de trabalho** — Rascunho de modelos de receita e estratégias de crescimento orgânico.
 
@@ -141,8 +141,8 @@
 
 ---
 
-<div align="center">
-  [◀ Arquitetura Técnica](./03_ARQUITETURA_TECNICA.md) | [🏠 Início](../README.md) | [Pitch Resumo ▶](./05_PITCH_RESUMO.md)
-</div>
+<p align="center">
+  <a href="./03_ARQUITETURA_TECNICA.md">◀ Arquitetura Técnica</a> | <a href="../README.md">🏠 Início</a> | <a href="./05_PITCH_RESUMO.md">Pitch Resumo ▶</a>
+</p>
 
 *Rascunho de trabalho — Revisitar com dados reais após MVP — Março/2026*

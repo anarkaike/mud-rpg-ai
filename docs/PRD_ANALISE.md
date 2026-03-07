@@ -1,8 +1,8 @@
 # 📋 Análise do PRD de Referência — meu-mud
 
-<div align="center">
-  [◀ Início](./README.md) | <strong>PRD Análise</strong> | [Pesquisa de MUDs ▶](./PESQUISA_MUDS.md)
-</div>
+<p align="center">
+  <a href="./README.md">◀ Início</a> | <b>PRD Análise</b> | <a href="./PESQUISA_MUDS.md">Pesquisa de MUDs ▶</a>
+</p>
 
 > Análise detalhada do [PRD do projeto meu-mud](https://github.com/lucaseneiva/meu-mud/blob/feature/domain-tests/docs/PRD.md) para servir de baseline e inspiração.
 
@@ -91,8 +91,8 @@ O PRD define um **MUD clássico e minimalista** — texto puro, sem combate, sem
 
 ---
 
-<div align="center">
-  [◀ Início](./README.md) | [Pesquisa de MUDs ▶](./PESQUISA_MUDS.md)
-</div>
+<p align="center">
+  <a href="./README.md">◀ Início</a> | <a href="./PESQUISA_MUDS.md">Pesquisa de MUDs ▶</a>
+</p>
 
 *Documento de referência — atualizar conforme o projeto evolui*

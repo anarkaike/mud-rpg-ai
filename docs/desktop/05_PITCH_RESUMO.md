@@ -1,8 +1,8 @@
 # 🎤 Pitch Resumo — MUD-AI
 
-<div align="center">
-  [◀ Monetização e Crescimento](./04_MONETIZACAO_E_CRESCIMENTO.md) | <strong>Pitch Resumo</strong> | [Economia & Salas ▶](./06_ECONOMIA_SALAS_IDENTIDADE.md)
-</div>
+<p align="center">
+  <a href="./04_MONETIZACAO_E_CRESCIMENTO.md">◀ Monetização e Crescimento</a> | <b>Pitch Resumo</b> | <a href="./06_ECONOMIA_SALAS_IDENTIDADE.md">Economia & Salas ▶</a>
+</p>
 
 > Para apresentações rápidas a parceiros, investidores e comunidade.
 
@@ -104,8 +104,8 @@ Eventos e festivais narrativos (B2C/B2B)
 
 ---
 
-<div align="center">
-  [◀ Monetização e Crescimento](./04_MONETIZACAO_E_CRESCIMENTO.md) | [🏠 Início](../README.md) | [Economia & Salas ▶](./06_ECONOMIA_SALAS_IDENTIDADE.md)
-</div>
+<p align="center">
+  <a href="./04_MONETIZACAO_E_CRESCIMENTO.md">◀ Monetização e Crescimento</a> | <a href="../README.md">🏠 Início</a> | <a href="./06_ECONOMIA_SALAS_IDENTIDADE.md">Economia & Salas ▶</a>
+</p>
 
 *Pitch v1 — Março/2026*

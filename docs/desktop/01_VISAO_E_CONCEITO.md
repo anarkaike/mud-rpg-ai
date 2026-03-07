@@ -1,8 +1,8 @@
 # 🌱 Visão e Conceito — MUD-AI
 
-<div align="center">
-  [◀ Início](../README.md) | <strong>Visão e Conceito</strong> | [Gameplay e Mecânicas ▶](./02_GAMEPLAY_E_MECANICAS.md)
-</div>
+<p align="center">
+  <a href="../README.md">◀ Início</a> | <b>Visão e Conceito</b> | <a href="./02_GAMEPLAY_E_MECANICAS.md">Gameplay e Mecânicas ▶</a>
+</p>
 
 > **Mesa de trabalho** — Este documento é um rascunho vivo de ideias em amadurecimento.
 
@@ -122,8 +122,8 @@ O jogo deve ser desenhado para acolher **diferentes formas de se estar no mundo*
 
 ---
 
-<div align="center">
-  [◀ Início](../README.md) | [Gameplay e Mecânicas ▶](./02_GAMEPLAY_E_MECANICAS.md)
-</div>
+<p align="center">
+  <a href="../README.md">◀ Início</a> | <a href="./02_GAMEPLAY_E_MECANICAS.md">Gameplay e Mecânicas ▶</a>
+</p>
 
 *Rascunho de trabalho — Última atualização: Março/2026*

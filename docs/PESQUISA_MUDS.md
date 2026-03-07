@@ -1,8 +1,8 @@
 # 🔍 Pesquisa — MUDs, Engines e Projetos Relacionados
 
-<div align="center">
-  [◀ PRD Análise](./PRD_ANALISE.md) | [🏠 Início](./README.md) | [Visão e Conceito ▶](./desktop/01_VISAO_E_CONCEITO.md)
-</div>
+<p align="center">
+  <a href="./PRD_ANALISE.md">◀ PRD Análise</a> | <a href="./README.md">🏠 Início</a> | <a href="./desktop/01_VISAO_E_CONCEITO.md">Visão e Conceito ▶</a>
+</p>
 
 > Comparação de engines, jogos e projetos modernos do ecossistema MUD para fundamentar decisões de design.
 
@@ -123,8 +123,8 @@ Multi-Comunidade → Escalável para qualquer grupo humano
 
 ---
 
-<div align="center">
-  [◀ PRD Análise](./PRD_ANALISE.md) | [🏠 Início](./README.md) | [Visão e Conceito ▶](./desktop/01_VISAO_E_CONCEITO.md)
-</div>
+<p align="center">
+  <a href="./PRD_ANALISE.md">◀ PRD Análise</a> | <a href="./README.md">🏠 Início</a> | <a href="./desktop/01_VISAO_E_CONCEITO.md">Visão e Conceito ▶</a>
+</p>
 
 *Pesquisa realizada em Março/2026 — Atualizar conforme novas referências surgirem*

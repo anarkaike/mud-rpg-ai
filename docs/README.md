@@ -1,8 +1,8 @@
 # 🎮 MUD-AI — Documentação do Projeto
 
-<div align="center">
-  <strong>🏠 Início</strong> | [PRD Análise](./PRD_ANALISE.md) | [Pesquisa de MUDs](./PESQUISA_MUDS.md) | [Visão e Conceito ▶](./desktop/01_VISAO_E_CONCEITO.md)
-</div>
+<p align="center">
+  <b>🏠 Início</b> | <a href="./PRD_ANALISE.md">PRD Análise</a> | <a href="./PESQUISA_MUDS.md">Pesquisa de MUDs</a> | <a href="./desktop/01_VISAO_E_CONCEITO.md">Visão e Conceito ▶</a>
+</p>
 
 > **RPG textual multiplayer mediado por IA, jogado via WhatsApp, com interação no mundo real através de QR Codes.**
 
@@ -10,19 +10,16 @@
 
 ## 📂 Estrutura da Documentação
 
-```
-docs/
-├── README.md                  ← Você está aqui
-├── PRD_ANALISE.md             ← [Análise do PRD de referência](./PRD_ANALISE.md)
-├── PESQUISA_MUDS.md           ← [Comparação de MUDs e engines](./PESQUISA_MUDS.md)
-├── desktop/                   ← 🧠 Mesa de trabalho (ideias & rascunhos)
-│   ├── 01_VISAO_E_CONCEITO.md          ← [Visão, Pilares e Público](./desktop/01_VISAO_E_CONCEITO.md)
-│   ├── 02_GAMEPLAY_E_MECANICAS.md      ← [Ciclo de Jogo e Experiência](./desktop/02_GAMEPLAY_E_MECANICAS.md)
-│   ├── 03_ARQUITETURA_TECNICA.md       ← [N8N, IA, Dados, Fluxos](./desktop/03_ARQUITETURA_TECNICA.md)
-│   ├── 04_MONETIZACAO_E_CRESCIMENTO.md ← [Modelos B2B/B2C, Fases](./desktop/04_MONETIZACAO_E_CRESCIMENTO.md)
-│   ├── 05_PITCH_RESUMO.md              ← [Pitch Comercial/Apresentação](./desktop/05_PITCH_RESUMO.md)
-│   └── 06_ECONOMIA_SALAS_IDENTIDADE.md ← [Economia, Salas e Avatares](./desktop/06_ECONOMIA_SALAS_IDENTIDADE.md)
-```
+- [README.md](./README.md) ← Você está aqui
+- [PRD_ANALISE.md](./PRD_ANALISE.md) ← Análise do PRD de referência
+- [PESQUISA_MUDS.md](./PESQUISA_MUDS.md) ← Comparação de MUDs e engines
+- **desktop/** ← 🧠 Mesa de trabalho (ideias & rascunhos)
+  - [01_VISAO_E_CONCEITO.md](./desktop/01_VISAO_E_CONCEITO.md) ← Visão, Pilares e Público
+  - [02_GAMEPLAY_E_MECANICAS.md](./desktop/02_GAMEPLAY_E_MECANICAS.md) ← Ciclo de Jogo e Experiência
+  - [03_ARQUITETURA_TECNICA.md](./desktop/03_ARQUITETURA_TECNICA.md) ← N8N, IA, Dados, Fluxos
+  - [04_MONETIZACAO_E_CRESCIMENTO.md](./desktop/04_MONETIZACAO_E_CRESCIMENTO.md) ← Modelos B2B/B2C, Fases
+  - [05_PITCH_RESUMO.md](./desktop/05_PITCH_RESUMO.md) ← Pitch Comercial/Apresentação
+  - [06_ECONOMIA_SALAS_IDENTIDADE.md](./desktop/06_ECONOMIA_SALAS_IDENTIDADE.md) ← Economia, Salas e Avatares
 
 ## 🎯 O que é este Projeto?
 
@@ -70,8 +67,8 @@ O projeto nasce com o objetivo de:
 
 ---
 
-<div align="center">
-  <strong>🏠 Início</strong> | [Visão e Conceito ▶](./desktop/01_VISAO_E_CONCEITO.md)
-</div>
+<p align="center">
+  <b>🏠 Início</b> | <a href="./desktop/01_VISAO_E_CONCEITO.md">Visão e Conceito ▶</a>
+</p>
 
 *Projeto em fase de ideação e design — Março 2026*

@@ -1,8 +1,8 @@
 # 🏗️ Arquitetura Técnica — MUD-AI
 
-<div align="center">
-  [◀ Gameplay e Mecânicas](./02_GAMEPLAY_E_MECANICAS.md) | <strong>Arquitetura Técnica</strong> | [Monetização e Crescimento ▶](./04_MONETIZACAO_E_CRESCIMENTO.md)
-</div>
+<p align="center">
+  <a href="./02_GAMEPLAY_E_MECANICAS.md">◀ Gameplay e Mecânicas</a> | <b>Arquitetura Técnica</b> | <a href="./04_MONETIZACAO_E_CRESCIMENTO.md">Monetização e Crescimento ▶</a>
+</p>
 
 > **Mesa de trabalho** — Rascunho de decisões técnicas e arquitetura.
 
@@ -202,8 +202,8 @@ Envia via WhatsApp
 
 ---
 
-<div align="center">
-  [◀ Gameplay e Mecânicas](./02_GAMEPLAY_E_MECANICAS.md) | [🏠 Início](../README.md) | [Monetização e Crescimento ▶](./04_MONETIZACAO_E_CRESCIMENTO.md)
-</div>
+<p align="center">
+  <a href="./02_GAMEPLAY_E_MECANICAS.md">◀ Gameplay e Mecânicas</a> | <a href="../README.md">🏠 Início</a> | <a href="./04_MONETIZACAO_E_CRESCIMENTO.md">Monetização e Crescimento ▶</a>
+</p>
 
 *Rascunho técnico — Evoluir conforme decisões são tomadas — Março/2026*

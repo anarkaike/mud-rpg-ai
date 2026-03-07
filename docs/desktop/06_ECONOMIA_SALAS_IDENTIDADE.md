@@ -1,8 +1,8 @@
 # 🏠 Economia, Salas e Identidade — MUD-AI
 
-<div align="center">
-  [◀ Pitch Resumo](./05_PITCH_RESUMO.md) | <strong>Economia & Salas</strong> | [🏠 Início](../README.md)
-</div>
+<p align="center">
+  <a href="./05_PITCH_RESUMO.md">◀ Pitch Resumo</a> | <b>Economia & Salas</b> | <a href="../README.md">🏠 Início</a>
+</p>
 
 > **Mesa de trabalho** — Ideias soltas em curadoria e amadurecimento. Nada aqui é definitivo.
 
@@ -204,8 +204,8 @@ Lista de decisões que ainda precisamos tomar:
 
 ---
 
-<div align="center">
-  [◀ Pitch Resumo](./05_PITCH_RESUMO.md) | [🏠 Início](../README.md)
-</div>
+<p align="center">
+  <a href="./05_PITCH_RESUMO.md">◀ Pitch Resumo</a> | <a href="../README.md">🏠 Início</a>
+</p>
 
 *Rascunho de trabalho — Ideias em curadoria — Março/2026*
