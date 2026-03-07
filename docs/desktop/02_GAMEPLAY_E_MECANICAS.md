@@ -1,5 +1,9 @@
 # 🎮 Gameplay e Mecânicas — MUD-AI
 
+<div align="center">
+  [◀ Visão e Conceito](./01_VISAO_E_CONCEITO.md) | <strong>Gameplay</strong> | [Arquitetura Técnica ▶](./03_ARQUITETURA_TECNICA.md)
+</div>
+
 > **Mesa de trabalho** — Rascunho vivo de mecânicas de jogo em amadurecimento.
 
 ---
@@ -33,7 +37,8 @@
 ### Mundo = Cidade Real
 - Cada **bairro** é um território com energia/temática própria
   - Ex: Liberdade = ancestralidade, Vila Madalena = experimentação, Centro = visibilidade
-- Cada **bar/empreendimento** é uma "sala" no MUD
+  - Ex: Parque Ibirapuera = natureza, Paulista = energia urbana, Pinheiros = criatividade
+- Cada **empreendimento/espaço** é uma "sala" no MUD (bar, ateliê, loja, parque, escola, coworking)
 - **QR Codes** em locais físicos destravam conteúdo exclusivo
 
 ### Como se Move
@@ -87,8 +92,8 @@ A IA atua como intermediária em TODA comunicação:
 ### Regras de Construção
 - Qualquer jogador pode criar blocos narrativos
 - Combinações precisam de consenso (os envolvidos aprovam)
-- Blocos mais populares viram "landmarks" permanentes
-- A IA curadoria garante qualidade e coerência
+- Blocos mais populares viram "landmarks" permanentes (e geram métricas e [Receita](./04_MONETIZACAO_E_CRESCIMENTO.md))
+- A IA curadoria garante qualidade e coerência (veja a [Arquitetura de IA](./03_ARQUITETURA_TECNICA.md))
 
 ---
 
@@ -130,9 +135,20 @@ Em vez de XP e level, usamos **consciências** e **conexões**:
 | **Tour** | "Faça o roteiro dos 5 bares indicados e registre" | Mundo real |
 
 ### Eventos Especiais
-- **Noites temáticas** em bares reais com missões exclusivas
+- **Noites temáticas** em locais parceiros com missões exclusivas
 - **Círculos semanais** de conversa (online ou presencial)
 - **Festivais narrativos** — construção coletiva de histórias
+
+### Exemplos por Comunidade
+
+| Comunidade | Missão exemplo |
+|-----------|----------------|
+| **LGBTQIA+** | "Visite o bar X e compartilhe o que acolhimento significa para você" |
+| **Artesãos** | "Leve uma peça ao ateliê Y e ensine alguém uma técnica" |
+| **Desenvolvedores** | "Faça pair programming de 30min com alguém do banco de trocas" |
+| **Estudantes** | "Descubra 3 locais no campus que ninguém conhece e descreva" |
+| **Turistas** | "Complete o roteiro cultural do bairro e registre suas impressões" |
+| **Introvertidos** | "Escreva uma reflexão anônima e veja quantas pessoas se identificam" |
 
 ---
 
@@ -151,15 +167,31 @@ Deck digital de cartas que provocam reflexão e ação:
 
 ---
 
-## 7. 🏠 O Bar como Hub
+## 7. 🏠 Locais Parceiros como Hubs
 
 ### Integração Física
 
-- **Quests do bar**: Montar noite temática, acolher pessoa isolada, criar mural
+> Não apenas bares — qualquer empreendimento de qualquer comunidade pode ser um hub.
+
+| Tipo de Local | Exemplo de integração |
+|--------------|-----|
+| **Bar** | Noite temática RPG, QR Codes nas mesas, cartas de consciência |
+| **Ateliê/Loja de artesão** | Missões de crafting, troca de técnicas |
+| **Coworking** | Banco de trocas profissional, matchmaking de habilidades |
+| **Parque** | Exploração ao ar livre, rituais de natureza |
+| **Escola/Universidade** | Missões de descoberta, mentoria entre gerações |
+| **Loja de varejo** | Tours de bairro, selos de fidelidade gamificados |
+| **Centro cultural** | Eventos híbridos, festivais narrativos |
+
+- **Quests do local**: Montar evento temático, acolher pessoa isolada, criar mural
 - **QR Codes espalhados**: Ativam cenas, diálogos secretos, cartas especiais
-- **Selos**: Completar missão no bar = selo no perfil + narrativa no feed
-- **Intenção do bar**: Definida no início da sessão, guia o gameplay
+- **Selos**: Completar missão no local = selo no perfil + narrativa no feed
+- **Intenção do local**: Definida no início da sessão, guia o gameplay
 
 ---
+
+<div align="center">
+  [◀ Visão e Conceito](./01_VISAO_E_CONCEITO.md) | [🏠 Início](../README.md) | [Arquitetura Técnica ▶](./03_ARQUITETURA_TECNICA.md)
+</div>
 
 *Rascunho de trabalho — Iterar conforme testamos conceitos — Março/2026*

@@ -1,35 +1,41 @@
 # 🎤 Pitch Resumo — MUD-AI
 
+<div align="center">
+  [◀ Monetização e Crescimento](./04_MONETIZACAO_E_CRESCIMENTO.md) | <strong>Pitch Resumo</strong>
+</div>
+
 > Para apresentações rápidas a parceiros, investidores e comunidade.
 
 ---
 
 ## Uma frase
 
-> **Um RPG textual via WhatsApp, mediado por IA, que conecta a comunidade LGBTQIA+ através de histórias, consciência e exploração da cidade real.**
+> **Um RPG textual via WhatsApp, mediado por IA, que conecta comunidades através de histórias, consciência e exploração da cidade real.**
 
 ---
 
 ## O Problema
 
-- Apps de pegação conectam **corpos**, não **essências**
-- A comunidade LGBTQIA+ tem talentos, habilidades e histórias incríveis — mas faltam pontes
-- Bares e empreendimentos LGBTQIA+ lutam por visibilidade e movimento
-- Muitos gays buscam **mentoria, acolhimento e pertencimento** sem saber onde encontrar
+- Apps de redes sociais conectam **perfis**, não **essências**
+- Comunidades inteiras têm talentos, habilidades e histórias incríveis — mas faltam pontes
+- Empreendimentos locais lutam por visibilidade e movimento
+- Introvertidos, autistas e pessoas neurodivergentes têm um universo interior riquíssimo — texto é a ponte ideal
+- Muitas pessoas buscam **mentoria, acolhimento e pertencimento** sem saber onde encontrar
 - A "sala de bate-papo" morreu — nada a substituiu
 
 ---
 
 ## A Solução
 
-Um **MUD (Multi-User Dungeon)** reinventado para a era da IA:
+Um **[MUD (Multi-User Dungeon)](../PESQUISA_MUDS.md)** reinventado para a era da IA:
 
-🎮 **É um jogo** — RPG textual jogado pelo WhatsApp, sem instalar nada
+🎮 **É um jogo** — [RPG textual jogado pelo WhatsApp](../README.md), sem instalar nada
 🤖 **IA como Game Master** — Cria narrativas, media conexões, expande consciência
-📍 **Mundo real integrado** — QR Codes em bares destravam conteúdo e missões
+📍 **Mundo real integrado** — QR Codes em locais reais destravam conteúdo e missões
 🧱 **Construído pelos jogadores** — Como Minecraft: cada história cria o mundo
 🤝 **Banco de trocas** — Conecta habilidades (quem oferece ↔ quem precisa)
-🌈 **Propósito** — Diversão + Amor + Autoconhecimento + Comunidade + Network
+🌟 **Multi-comunidade** — Cada grupo tem seu mundo, com [portais entre eles](./03_ARQUITETURA_TECNICA.md)
+🌈 **Propósito** — Diversão + Autoconhecimento + Comunidade + Network
 
 ---
 
@@ -39,7 +45,7 @@ Um **MUD (Multi-User Dungeon)** reinventado para a era da IA:
 |---|---------|-----------|
 | 1 | **Texto + IA como mediador** | Canal seguro para partilhar memórias, anseios e aprendizados entre desconhecidos |
 | 2 | **Rituais e cartas de consciência** | Autoconhecimento como gameplay — não como obrigação |
-| 3 | **Mapas afetivos & tours urbanos** | Bares viram checkpoints; turismo queer impulsionado |
+| 3 | **Mapas afetivos & tours urbanos** | Empreendimentos viram checkpoints; turismo local impulsionado |
 | 4 | **Banco de trocas** | Talentos tímidos florescem; mentoria orgânica |
 | 5 | **Narrativas compartilhadas** | Textos viram conteúdo do site, diários, playlists, ações |
 | 6 | **Construção emergente** | Jogadores criam o universo com suas histórias e reflexões |
@@ -60,11 +66,12 @@ Um **MUD (Multi-User Dungeon)** reinventado para a era da IA:
 
 ## Números de Contexto
 
-- **6 cidades** com Guia Gay ativo (SP, BH, Floripa, Rio, Salvador, Brasília)
+- **Lançamento**: Comunidade LGBTQIA+ via Guia Gay (6 cidades: SP, BH, Floripa, Rio, Salvador, Brasília)
+- **Expansão**: Artesãos, introvertidos, devs, estudantes, turistas, gamers, varejo, bairros...
 - **WhatsApp**: 99% de penetração no Brasil, 120M+ usuários
-- **Comunidade LGBTQIA+**: ~10% da população = ~20M no Brasil
 - **Custo por jogador**: Baixo (apenas tokens de IA + infra)
 - **Barreira de entrada**: Zero (WhatsApp já instalado)
+- **Potencial**: Qualquer comunidade no mundo inteiro
 
 ---
 
@@ -85,15 +92,20 @@ Eventos e festivais narrativos (B2C/B2B)
 ## Próximos Passos
 
 1. 🏗️ **Protótipo funcional** — N8N + WhatsApp + 1 sala + IA
-2. 🍺 **3 bares parceiros** em São Paulo
+2. 🍺 **3-5 locais parceiros** em São Paulo (lançamento LGBTQIA+)
 3. 🧪 **Piloto fechado** com 50 jogadores do Guia Gay SP
 4. 📊 **Validar** retenção e engajamento
-5. 🚀 **Iterar e expandir**
+5. 🌿 **Segunda comunidade** — testar com devs ou artesãos
+6. 🚀 **Iterar, expandir, escalar** para mais comunidades e cidades
 
 ---
 
 > _"Não é um app. Não é uma rede social. É uma **experiência viva** que conecta, cura, inspira e fortalece — uma mensagem de cada vez."_
 
 ---
+
+<div align="center">
+  [◀ Monetização e Crescimento](./04_MONETIZACAO_E_CRESCIMENTO.md) | [🏠 Início](../README.md)
+</div>
 
 *Pitch v1 — Março/2026*

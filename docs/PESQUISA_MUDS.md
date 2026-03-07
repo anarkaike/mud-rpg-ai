@@ -1,5 +1,9 @@
 # 🔍 Pesquisa — MUDs, Engines e Projetos Relacionados
 
+<div align="center">
+  [◀ PRD Análise](./PRD_ANALISE.md) | [🏠 Início](./README.md) | [Visão e Conceito ▶](./desktop/01_VISAO_E_CONCEITO.md)
+</div>
+
 > Comparação de engines, jogos e projetos modernos do ecossistema MUD para fundamentar decisões de design.
 
 ---
@@ -62,10 +66,10 @@
 
 ### 🔥 Features que mais nos inspiram:
 
-1. **Alter Aeon — Doação de XP**: Jogadores ajudam outros a progredir → nosso "Banco de Trocas"
-2. **Astaria — Construção por jogadores**: Mundo player-driven → nosso "Minecraft narrativo"
-3. **Threshold — Política e alianças**: Relações complexas → nossas "Conexões de consciência"
-4. **Discworld — Narrativa com personalidade**: Tom único → nossa voz queer/consciente
+1. **Alter Aeon — Doação de XP**: Jogadores ajudam outros a progredir → nosso "[Banco de Trocas](./desktop/01_VISAO_E_CONCEITO.md)"
+2. **Astaria — Construção por jogadores**: Mundo player-driven → nosso "[Minecraft narrativo](./desktop/02_GAMEPLAY_E_MECANICAS.md)"
+3. **Threshold — Política e alianças**: Relações complexas → nossas "[Conexões de consciência](./desktop/01_VISAO_E_CONCEITO.md)"
+4. **Discworld — Narrativa com personalidade**: Tom único → nossa voz autêntica e consciente por comunidade
 
 ---
 
@@ -99,21 +103,28 @@ Inteligência AI  → IA como Game Master + mediadora consciente
     +
 WhatsApp         → Interface universal, sem fricção
     +
-Mundo Real       → QR Codes + bares + tours urbanos
+Mundo Real       → QR Codes + empreendimentos + tours urbanos
     +
-Propósito Social → Comunidade LGBTQIA+ + consciência + network
+Propósito Social → Comunidades diversas + consciência + network
     +
 Construção Emergente → Jogadores criam o mundo
+    +
+Multi-Comunidade → Escalável para qualquer grupo humano
 ```
 
 ### Vantagens competitivas
 
 1. **Zero fricção**: Não precisa instalar nada (WhatsApp já está no celular)
-2. **Público definido**: Comunidade LGBTQIA+ com rede de sites existente
-3. **Ponte real-virtual**: QR Codes transformam bares em portais do jogo
+2. **Público definido**: Lançamento com comunidade LGBTQIA+ (Guia Gay), expansível para qualquer comunidade
+3. **Ponte real-virtual**: QR Codes transformam locais em portais do jogo
 4. **IA como diferencial**: Não é um MUD com IA "colada", a IA É o jogo
 5. **Propósito**: Vai além de "jogar" — conecta, cura, fortalece
+6. **Arquitetura multi-comunidade**: Cada comunidade pode ter seu "mundo" com identidade própria, mas com portais para os outros
 
 ---
+
+<div align="center">
+  [◀ PRD Análise](./PRD_ANALISE.md) | [🏠 Início](./README.md) | [Visão e Conceito ▶](./desktop/01_VISAO_E_CONCEITO.md)
+</div>
 
 *Pesquisa realizada em Março/2026 — Atualizar conforme novas referências surgirem*

@@ -1,5 +1,9 @@
 # 📋 Análise do PRD de Referência — meu-mud
 
+<div align="center">
+  [◀ Início](./README.md) | <strong>PRD Análise</strong> | [Pesquisa de MUDs ▶](./PESQUISA_MUDS.md)
+</div>
+
 > Análise detalhada do [PRD do projeto meu-mud](https://github.com/lucaseneiva/meu-mud/blob/feature/domain-tests/docs/PRD.md) para servir de baseline e inspiração.
 
 ---
@@ -80,9 +84,15 @@ O PRD define um **MUD clássico e minimalista** — texto puro, sem combate, sem
 4. **Sistema de "consciências"** — Mecânicas de autoconhecimento
 5. **Banco de trocas** — Habilidades oferecidas/necessitadas
 6. **Construção emergente** — Jogadores criam o mundo (estilo Minecraft)
-7. **Monetização** — Modelo de negócio sustentável
+    7. **Monetização** — [Modelo de negócio sustentável](./desktop/04_MONETIZACAO_E_CRESCIMENTO.md)
 8. **Moderação por IA** — Segurança e inclusividade
+9. **Arquitetura multi-comunidade** — [Sistema de mundos/reinos em evolução](./desktop/03_ARQUITETURA_TECNICA.md)
+10. **Diversidade e neuroatipicidade** — Interfaces que respeitem formas de interação variadas
 
 ---
+
+<div align="center">
+  [◀ Início](./README.md) | [Pesquisa de MUDs ▶](./PESQUISA_MUDS.md)
+</div>
 
 *Documento de referência — atualizar conforme o projeto evolui*

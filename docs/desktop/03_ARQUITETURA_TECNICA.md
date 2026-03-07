@@ -1,5 +1,9 @@
 # 🏗️ Arquitetura Técnica — MUD-AI
 
+<div align="center">
+  [◀ Gameplay e Mecânicas](./02_GAMEPLAY_E_MECANICAS.md) | <strong>Arquitetura Técnica</strong> | [Monetização e Crescimento ▶](./04_MONETIZACAO_E_CRESCIMENTO.md)
+</div>
+
 > **Mesa de trabalho** — Rascunho de decisões técnicas e arquitetura.
 
 ---
@@ -123,6 +127,7 @@ Envia via WhatsApp
   "phone_hash": "sha256...",
   "nome_personagem": "string",
   "sala_atual": "sala_id",
+  "comunidades": ["lgbtqia_sp", "devs_sp"],
   "consciencias_desbloqueadas": ["acolhimento", "coragem"],
   "habilidades_ofereco": ["design", "python"],
   "habilidades_preciso": ["marketing"],
@@ -130,6 +135,7 @@ Envia via WhatsApp
   "blocos_criados": 5,
   "locais_visitados": ["bar_1", "bar_3"],
   "badges": ["semente", "ponte"],
+  "idiomas": ["pt-BR", "en"],
   "criado_em": "timestamp",
   "ultima_atividade": "timestamp"
 }
@@ -139,7 +145,8 @@ Envia via WhatsApp
 ```json
 {
   "id": "uuid",
-  "tipo": "bar|bairro|evento|virtual",
+  "tipo": "bar|atelie|loja|parque|escola|coworking|evento|virtual",
+  "comunidade_id": "lgbtqia_sp",
   "nome": "Bar XYZ",
   "descricao_base": "Um bar acolhedor na Consolação...",
   "descricao_ia": "gerada/evoluída pela IA",
@@ -190,7 +197,13 @@ Envia via WhatsApp
 - [ ] Hospedar N8N onde? (self-hosted vs cloud)
 - [ ] Como gerenciar custo de tokens de IA por jogador?
 - [ ] Privacidade: como anonimizar dados sensíveis?
+- [ ] Arquitetura multi-comunidade: mundos separados com portais, ou mundo único com "camadas"?
+- [ ] Suporte multilíngue: IA traduz em tempo real ou comunidades por idioma?
 
 ---
+
+<div align="center">
+  [◀ Gameplay e Mecânicas](./02_GAMEPLAY_E_MECANICAS.md) | [🏠 Início](../README.md) | [Monetização e Crescimento ▶](./04_MONETIZACAO_E_CRESCIMENTO.md)
+</div>
 
 *Rascunho técnico — Evoluir conforme decisões são tomadas — Março/2026*

@@ -1,5 +1,9 @@
 # 💰 Monetização e Crescimento — MUD-AI
 
+<div align="center">
+  [◀ Arquitetura Técnica](./03_ARQUITETURA_TECNICA.md) | <strong>Monetização</strong> | [Pitch Resumo ▶](./05_PITCH_RESUMO.md)
+</div>
+
 > **Mesa de trabalho** — Rascunho de modelos de receita e estratégias de crescimento orgânico.
 
 ---
@@ -22,7 +26,7 @@
 
 | Produto | Descrição | Preço sugerido |
 |---------|-----------|----------------|
-| **Sala Patrocinada** | Bar/empreendimento como local no jogo com QR Code | Assinatura mensal |
+| **Sala Patrocinada** | Bar/empreendimento como local no [jogo principal](./02_GAMEPLAY_E_MECANICAS.md) com QR Code | Assinatura mensal |
 | **Missões Patrocinadas** | Missões que levam jogadores ao local | Por campanha |
 | **Eventos no jogo** | Noites temáticas com integração RPG | Por evento |
 | **Analytics** | Dados de fluxo de jogadores (anonimizados) | Premium mensal |
@@ -42,9 +46,9 @@
 
 ### 3. 📊 Dados e Insights (B2B2C)
 
-- Relatórios de tendências da comunidade LGBTQIA+ (anonimizados)
-- Heatmaps de exploração urbana
-- Insights de consumo para bares parceiros
+- Relatórios de tendências de comunidades (anonimizados)
+- Heatmaps de exploração urbana por comunidade
+- Insights de consumo para empreendimentos parceiros
 
 ### 4. 🎪 Eventos e Experiências
 
@@ -58,41 +62,46 @@
 
 ### Fase 1: Semente (0-100 jogadores) 🌱
 **Objetivo**: Validar o conceito com grupo pequeno
+**Comunidade**: LGBTQIA+ (via Guia Gay SP)
 
 - Lançar com 1 cidade (São Paulo)
 - 3-5 bares parceiros pioneiros
-- Convite fechado (comunidade dos Guiasassin Gay)
-- Zero custo para bares (provar valor primeiro)
+- Convite fechado (comunidade dos Guias Gay)
+- Zero custo para empreendimentos (provar valor primeiro)
 - Coletar feedback intenso
 
 **Métricas**: Retenção D7, mensagens/jogador/dia, satisfação qualitativa
 
 ### Fase 2: Raízes (100-1.000 jogadores) 🌿
 **Objetivo**: Produto-market fit
+**Comunidade**: LGBTQIA+ expandida + primeiras comunidades secundárias
 
 - Abrir inscrição via sites Guia Gay
-- 10-20 bares parceiros
+- 10-20 empreendimentos parceiros (bares, ateliês, coworkings)
 - Primeiras missões de tour urbano
 - Sistema de indicação (jogador convida jogador)
-- Começar cobrança leve de bares (modelo freemium)
+- Testar com 1-2 comunidades secundárias (ex: devs, artesãos)
+- Começar cobrança leve de empreendimentos (modelo freemium)
 
-**Métricas**: Crescimento orgânico, conversão bar→parceiro, NPS
+**Métricas**: Crescimento orgânico, conversão empreendimento→parceiro, NPS
 
 ### Fase 3: Tronco (1.000-10.000 jogadores) 🌳
-**Objetivo**: Sustentabilidade financeira
+**Objetivo**: Sustentabilidade financeira + multi-comunidade
 
-- Expandir para BH, Floripa, Rio
+- Expandir para BH, Floripa, Rio (LGBTQIA+)
+- Lançar oficialmente para 3-5 comunidades secundárias
 - Monetização B2C (itens premium)
-- Eventos híbridos regulares
+- Eventos híbridos regulares por comunidade
 - Primeiro funcionário (community manager)
 
 ### Fase 4: Copa (10.000+ jogadores) 🌲
-**Objetivo**: Escala
+**Objetivo**: Escala multi-comunidade nacional
 
-- Todas as cidades Guia Gay
-- API aberta para bares criarem próprias missões
-- Marketplace de habilidades profissional
-- Franquias em outras cidades/países
+- Plataforma aberta: qualquer comunidade pode criar seu "mundo"
+- API aberta para empreendimentos criarem próprias missões
+- Marketplace de habilidades profissional inter-comunidades
+- Expansão internacional (português → espanhol → inglês)
+- Comunidades se conectam via "portais" entre mundos
 
 ---
 
@@ -108,7 +117,8 @@
 1. **Podcast** com histórias do jogo (anonimizadas)
 2. **Exposições** de blocos narrativos mais bonitos
 3. **Livro coletivo** compilando as melhores histórias
-4. **Documentário** sobre o impacto na comunidade
+4. **Documentário** sobre o impacto nas comunidades
+5. **White-label**: Empresas/marcas criam mundos temáticos para seus clientes
 
 ### Integrações
 1. **Instagram/TikTok** — Compartilhar conquistas e badges
@@ -130,5 +140,9 @@
 | Fadiga de engagement | Jogadores abandonam | Notificações inteligentes, sem spam |
 
 ---
+
+<div align="center">
+  [◀ Arquitetura Técnica](./03_ARQUITETURA_TECNICA.md) | [🏠 Início](../README.md) | [Pitch Resumo ▶](./05_PITCH_RESUMO.md)
+</div>
 
 *Rascunho de trabalho — Revisitar com dados reais após MVP — Março/2026*
