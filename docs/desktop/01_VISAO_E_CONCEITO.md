@@ -10,7 +10,7 @@
 
 ## A Proposta
 
-> _"Uma nova forma de bate papo"_ — simples, orgânico, escalável, textual e mental. Uma semente que cresce com os próprios jogadores. Um mundo que se expande com as histórias e ações dos jogadores, moldado pela imaginação e essência de cada um em mescla com a comunidade, como cores no pintar e esculpir de uma obra de arte.
+> _"Uma nova forma de bate papo"_ — simples, orgânico, escalável, textual e mental. Uma semente que cresce com os próprios jogadores. Um mundo que se expande com as histórias e ações dos jogadores, moldado pela imaginação e essência de cada um em mescla com a comunidade, como cores no pintar e esculpir de uma obra de arte coletivamente gerada.
 
 Um **RPG textual via WhatsApp**, mediado por IA, que conecta **qualquer comunidade** de forma profunda — através de **texto, consciência, histórias e ação no mundo real**.
 
