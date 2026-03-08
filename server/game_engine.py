@@ -260,6 +260,8 @@ async def process_action(phone: str, message: str) -> str:
                 return _handle_explore(phone, meta)
             case "decorate_question":
                 return _handle_decor_question(phone, meta, target or message)
+            case "confirm_contextual_publish":
+                return _handle_contextual_publish_confirmation(phone, meta, action)
             case "decorate":
                 return await _handle_decorate(phone, meta, target or message)
             case "help":
@@ -503,7 +505,27 @@ async def _handle_move(phone: str, meta: dict, target: str) -> str:
         profile_url=_generate_profile_url(phone),
     )
 
-    return _attach_room_challenge(phone, meta, room_info, response, trigger="move")
+
+def _handle_contextual_publish_confirmation(phone: str, meta: dict, contextual: dict) -> str:
+    room_info = _get_current_room_context(meta)
+    intent_type = str(contextual.get("intent_type", "decorate") or "decorate")
+    payload = str(contextual.get("payload", "") or "").strip()
+    if not payload:
+        return fmt.format_error("Não consegui extrair a essência dessa ação ainda. Tente reformular em uma frase curta.")
+    _update_meta(phone, {"pending_action": {"type": "contextual_publish", "intent_type": intent_type, "payload": payload}})
+    action_label, narrative, suggestions = _build_contextual_confirmation_prompt(intent_type, payload, room_info)
+    return fmt.format_interaction(
+        room_name=room_info.get("name", "Sala"),
+        action_label=action_label,
+        seeds=meta.get("seeds", 0),
+        seeds_change=0,
+        level=_calculate_level(meta),
+        narrative=narrative,
+        badge=None,
+        suggestions=suggestions,
+        breadcrumb=room_info.get("name", "Sala").replace("🌱 ", ""),
+        profile_url=_generate_profile_url(phone),
+    )
 
 
 def _derive_player_tone_hints(meta: dict, profile_signals: dict) -> list[str]:
@@ -1015,29 +1037,135 @@ def _clean_implicit_contribution_text(message: str) -> str:
     return fragment.strip(" \n\t")
 
 
-def _looks_like_implicit_room_contribution(message: str, room_info: dict | None) -> bool:
+def _infer_room_primary_action(room_info: dict | None) -> str:
+    tags = [str(tag or "").lower() for tag in (room_info or {}).get("tags", [])]
+    purpose = str((room_info or {}).get("purpose", "") or "").lower()
+    if any(tag in tags for tag in ["poesia", "escrita", "poema", "literatura"]) or any(term in purpose for term in ["poesia", "escrita", "verso", "poema"]):
+        return "publish"
+    if any(tag in tags for tag in ["arte", "galeria", "exposição", "exposicao", "criatividade", "visual"]) or any(term in purpose for term in ["arte", "galeria", "expos", "criação", "criacao", "visual"]):
+        return "showcase_creation"
+    if any(tag in tags for tag in ["psicodelia", "psicodélica", "psicodelico", "psicodélico", "experiência", "experiencia"]) or any(term in purpose for term in ["psicodel", "experiência", "experiencia", "visão", "visao"]):
+        return "share_experience"
+    if any(tag in tags for tag in ["meditação", "meditacao", "reflexão", "reflexao", "silêncio", "silencio", "contemplação", "contemplacao"]) or any(term in purpose for term in ["medita", "reflex", "silêncio", "silencio", "contempla"]):
+        return "share_reflection"
+    if any(tag in tags for tag in ["apoio", "acolhimento", "cuidado", "escuta", "terapia"]) or any(term in purpose for term in ["apoio", "acolh", "cuidado", "escuta", "amparo"]):
+        return "share_support"
+    if any(tag in tags for tag in ["troca", "conexão", "conexao", "networking"] ) or any(term in purpose for term in ["troca", "networking", "conex"]):
+        return "register_exchange"
+    if any(tag in tags for tag in ["laboratório", "laboratorio", "oficina", "aprendizado", "estudo", "pesquisa", "experimento"]) or any(term in purpose for term in ["laborat", "oficina", "aprend", "estudo", "pesquisa", "experimento"]):
+        return "share_insight"
+    return "decorate"
+
+
+def _analyze_contextual_message_intent(message: str, room_info: dict | None) -> dict | None:
     text = (message or "").strip()
     normalized = _normalize_phrase(text)
     if not normalized or _looks_like_question(message):
-        return False
+        return None
     if normalized in {"olhar", "perfil", "salas", "explorar", "ajuda", "help", "sementes"}:
-        return False
+        return None
     if _infer_conversational_action(message, room_info=room_info):
-        return False
+        return None
 
     tags = [str(tag or "").lower() for tag in (room_info or {}).get("tags", [])]
     purpose = str((room_info or {}).get("purpose", "") or "").lower()
     line_count = len([line for line in text.splitlines() if line.strip()])
     word_count = len(normalized.split())
+    primary_action = _infer_room_primary_action(room_info)
 
     poetic_room = any(tag in tags for tag in ["poesia", "escrita", "poema", "literatura"]) or any(term in purpose for term in ["poesia", "escrita", "verso", "poema"])
     exchange_room = any(tag in tags for tag in ["troca", "conexão", "conexao", "networking"]) or any(term in purpose for term in ["troca", "conex", "networking"])
+    psychedelic_room = any(tag in tags for tag in ["psicodelia", "psicodélica", "psicodelico", "psicodélico", "experiência", "experiencia"]) or any(term in purpose for term in ["psicodel", "experiência", "experiencia", "visão", "visao"])
+    art_room = any(tag in tags for tag in ["arte", "galeria", "exposição", "exposicao", "criatividade", "visual"]) or any(term in purpose for term in ["arte", "galeria", "expos", "criação", "criacao", "visual"])
+    reflection_room = any(tag in tags for tag in ["meditação", "meditacao", "reflexão", "reflexao", "silêncio", "silencio", "contemplação", "contemplacao"]) or any(term in purpose for term in ["medita", "reflex", "silêncio", "silencio", "contempla"])
+    support_room = any(tag in tags for tag in ["apoio", "acolhimento", "cuidado", "escuta", "terapia"]) or any(term in purpose for term in ["apoio", "acolh", "cuidado", "escuta", "amparo"])
+    learning_room = any(tag in tags for tag in ["laboratório", "laboratorio", "oficina", "aprendizado", "estudo", "pesquisa", "experimento"]) or any(term in purpose for term in ["laborat", "oficina", "aprend", "estudo", "pesquisa", "experimento"])
 
     if poetic_room and (line_count >= 2 or word_count >= 6):
-        return True
+        return {
+            "action": "confirm_contextual_publish",
+            "intent_type": "publish",
+            "payload": _clean_implicit_contribution_text(message),
+            "label": "publicar este poema",
+        }
     if exchange_room and _contains_any(normalized, ["ofereço", "ofereco", "busco", "procuro", "troco", "posso ajudar", "preciso de", "quero encontrar"]):
-        return True
-    return False
+        return {
+            "action": "confirm_contextual_publish",
+            "intent_type": "register_exchange",
+            "payload": _clean_implicit_contribution_text(message),
+            "label": "registrar essa troca",
+        }
+    if psychedelic_room and (line_count >= 2 or word_count >= 8 or _contains_any(normalized, ["vi", "senti", "percebi", "experiencia", "experiência", "visão", "visao", "sensação", "sensacao"])):
+        return {
+            "action": "confirm_contextual_publish",
+            "intent_type": "share_experience",
+            "payload": _clean_implicit_contribution_text(message),
+            "label": "compartilhar essa experiência",
+        }
+    if art_room and (line_count >= 2 or word_count >= 6 or _contains_any(normalized, ["criei", "pintei", "desenhei", "colagem", "instalação", "instalacao", "obra", "composição", "composicao"])):
+        return {
+            "action": "confirm_contextual_publish",
+            "intent_type": "showcase_creation",
+            "payload": _clean_implicit_contribution_text(message),
+            "label": "expor essa criação",
+        }
+    if reflection_room and (line_count >= 2 or word_count >= 6 or _contains_any(normalized, ["refleti", "percebi", "aprendi", "silêncio", "silencio", "presença", "presenca", "contemplei"])):
+        return {
+            "action": "confirm_contextual_publish",
+            "intent_type": "share_reflection",
+            "payload": _clean_implicit_contribution_text(message),
+            "label": "registrar essa reflexão",
+        }
+    if support_room and (line_count >= 2 or word_count >= 6 or _contains_any(normalized, ["estou", "preciso", "quero apoio", "me sinto", "desabafo", "cuidar", "acolher", "escuta"])):
+        return {
+            "action": "confirm_contextual_publish",
+            "intent_type": "share_support",
+            "payload": _clean_implicit_contribution_text(message),
+            "label": "compartilhar isso como cuidado ou desabafo",
+        }
+    if learning_room and (line_count >= 2 or word_count >= 6 or _contains_any(normalized, ["aprendi", "testei", "experimentei", "descobri", "insight", "hipótese", "hipotese", "método", "metodo"])):
+        return {
+            "action": "confirm_contextual_publish",
+            "intent_type": "share_insight",
+            "payload": _clean_implicit_contribution_text(message),
+            "label": "compartilhar esse insight",
+        }
+    if primary_action == "decorate" and (_contains_any(normalized, ["arvore", "árvore", "flor", "vela", "quadro", "mural", "cor", "cores", "luz", "brilho"]) or _looks_like_direct_decoration_intent(message)):
+        return {
+            "action": "confirm_contextual_publish",
+            "intent_type": "decorate",
+            "payload": _extract_decoration_fragment(message) or _clean_implicit_contribution_text(message),
+            "label": "adicionar esse elemento",
+        }
+    return None
+
+
+def _build_contextual_confirmation_prompt(intent_type: str, payload: str, room_info: dict | None) -> tuple[str, str, list[dict]]:
+    room_name = (room_info or {}).get("name", "Sala")
+    clean_payload = (payload or "").strip() or "essa contribuição"
+    if intent_type == "publish":
+        narrative = f"Identifiquei um poema ou texto autoral com cara de publicação em *{room_name}*. Deseja publicar este poema?\n\n_{clean_payload}_"
+        return "Publicar", narrative, [{"cmd": "sim", "desc": "publicar agora"}, {"cmd": "ajusta o final", "desc": "refinar antes"}]
+    if intent_type == "share_experience":
+        narrative = f"Essa mensagem parece um relato ou experiência que combina com *{room_name}*. Deseja compartilhar essa experiência nesta sala?\n\n_{clean_payload}_"
+        return "Compartilhar experiência", narrative, [{"cmd": "sim", "desc": "compartilhar agora"}, {"cmd": "resuma mais", "desc": "refinar antes"}]
+    if intent_type == "showcase_creation":
+        narrative = f"Isso parece uma criação ou proposta artística alinhada com *{room_name}*. Deseja expor essa criação aqui?\n\n_{clean_payload}_"
+        return "Expor criação", narrative, [{"cmd": "sim", "desc": "expor agora"}, {"cmd": "deixa mais visual", "desc": "refinar antes"}]
+    if intent_type == "share_reflection":
+        narrative = f"Essa mensagem soa como uma reflexão que combina com *{room_name}*. Deseja registrar essa reflexão nesta sala?\n\n_{clean_payload}_"
+        return "Registrar reflexão", narrative, [{"cmd": "sim", "desc": "registrar agora"}, {"cmd": "resuma melhor", "desc": "refinar antes"}]
+    if intent_type == "share_support":
+        narrative = f"Isso parece um desabafo, cuidado ou gesto de apoio coerente com *{room_name}*. Deseja compartilhar isso aqui?\n\n_{clean_payload}_"
+        return "Compartilhar apoio", narrative, [{"cmd": "sim", "desc": "compartilhar agora"}, {"cmd": "deixa mais delicado", "desc": "refinar antes"}]
+    if intent_type == "register_exchange":
+        narrative = f"Isso parece uma oferta, pedido ou ponte útil para *{room_name}*. Deseja registrar essa troca aqui?\n\n_{clean_payload}_"
+        return "Registrar troca", narrative, [{"cmd": "sim", "desc": "registrar agora"}, {"cmd": "deixa mais claro", "desc": "refinar antes"}]
+    if intent_type == "share_insight":
+        narrative = f"Essa mensagem parece um insight, experimento ou descoberta útil para *{room_name}*. Deseja compartilhar esse insight aqui?\n\n_{clean_payload}_"
+        return "Compartilhar insight", narrative, [{"cmd": "sim", "desc": "compartilhar agora"}, {"cmd": "organiza melhor", "desc": "refinar antes"}]
+    narrative = f"Entendi isso como uma ação de modificação em *{room_name}*. Deseja adicionar esse elemento à sala?\n\n_{clean_payload}_"
+    return "Adicionar elemento", narrative, [{"cmd": "sim", "desc": "adicionar agora"}, {"cmd": "com mais detalhe", "desc": "refinar antes"}]
 
 
 def _infer_contextual_conversational_action(message: str, meta: dict) -> dict | None:
@@ -1045,8 +1173,9 @@ def _infer_contextual_conversational_action(message: str, meta: dict) -> dict | 
     if _looks_like_decor_question(message):
         fragment = _extract_decoration_fragment(message)
         return {"action": "decorate_question", "target": fragment or message.strip()}
-    if _looks_like_implicit_room_contribution(message, room_info):
-        return {"action": "decorate", "target": _clean_implicit_contribution_text(message)}
+    contextual = _analyze_contextual_message_intent(message, room_info)
+    if contextual:
+        return contextual
     return None
 
 
@@ -1253,6 +1382,35 @@ async def _handle_pending_action(phone: str, meta: dict, message: str) -> str | 
         fragment = str(pending.get("fragment", "") or "").strip()
         if fragment:
             return await _handle_decorate(phone, {**meta, "pending_action": None}, f"decorar {fragment} {text}".strip())
+        _update_meta(phone, {"pending_action": None})
+        return None
+
+    if pending_type == "contextual_publish":
+        normalized = _normalize_phrase(text)
+        payload = str(pending.get("payload", "") or "").strip()
+        intent_type = str(pending.get("intent_type", "decorate") or "decorate").strip()
+        if normalized in {"sim", "s", "pode", "pode sim", "manda", "ok", "isso", "faz isso", "publica", "publique"}:
+            if not payload:
+                _update_meta(phone, {"pending_action": None})
+                return None
+            return await _handle_decorate(phone, {**meta, "pending_action": None}, f"decorar {payload}")
+        if payload:
+            refined_payload = f"{payload} {text}".strip()
+            _update_meta(phone, {"pending_action": {"type": "contextual_publish", "intent_type": intent_type, "payload": refined_payload}})
+            room_info = _get_current_room_context(meta)
+            action_label, narrative, suggestions = _build_contextual_confirmation_prompt(intent_type, refined_payload, room_info)
+            return fmt.format_interaction(
+                room_name=room_info.get("name", "Sala"),
+                action_label=action_label,
+                seeds=meta.get("seeds", 0),
+                seeds_change=0,
+                level=_calculate_level(meta),
+                narrative=narrative,
+                badge=None,
+                suggestions=suggestions,
+                breadcrumb=room_info.get("name", "Sala").replace("🌱 ", ""),
+                profile_url=_generate_profile_url(phone),
+            )
         _update_meta(phone, {"pending_action": None})
         return None
 
