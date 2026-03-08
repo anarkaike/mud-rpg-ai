@@ -11,15 +11,20 @@ import httpx
 from typing import Optional
 
 
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
 DEFAULT_MODEL = "gpt-4o-mini"
 DEFAULT_TEMPERATURE = 0.7
 DEFAULT_MAX_TOKENS = 300
+
+
+def _openai_api_key() -> str:
+    return os.environ.get("OPENAI_API_KEY", "")
+
+
+def _gemini_api_key() -> str:
+    return os.environ.get("GEMINI_API_KEY", "")
 
 
 async def chat_completion(
@@ -35,18 +40,21 @@ async def chat_completion(
     Returns the assistant's response text.
     Falls back to Gemini if OpenAI fails.
     """
-    if not OPENAI_API_KEY and not GEMINI_API_KEY:
+    openai_api_key = _openai_api_key()
+    gemini_api_key = _gemini_api_key()
+
+    if not openai_api_key and not gemini_api_key:
         raise RuntimeError("No AI provider API key configured. Set OPENAI_API_KEY or GEMINI_API_KEY.")
 
     try:
-        if not OPENAI_API_KEY:
+        if not openai_api_key:
             raise RuntimeError("OPENAI_API_KEY not configured")
-        return await _openai_chat(system_prompt, user_message, model, temperature, max_tokens, json_mode)
+        return await _openai_chat(system_prompt, user_message, model, temperature, max_tokens, json_mode, openai_api_key)
     except Exception as e:
         print(f"⚠️ OpenAI failed: {e}")
-        if GEMINI_API_KEY:
+        if gemini_api_key:
             try:
-                return await _gemini_chat(system_prompt, user_message, temperature, max_tokens)
+                return await _gemini_chat(system_prompt, user_message, temperature, max_tokens, gemini_api_key)
             except Exception as ge:
                 print(f"⚠️ Gemini also failed: {ge}")
         raise
@@ -92,10 +100,11 @@ async def _openai_chat(
     temperature: float,
     max_tokens: int,
     json_mode: bool,
+    openai_api_key: str,
 ) -> str:
     """Call OpenAI Chat Completions API."""
     headers = {
-        "Authorization": f"Bearer {OPENAI_API_KEY}",
+        "Authorization": f"Bearer {openai_api_key}",
         "Content-Type": "application/json",
     }
 
@@ -126,9 +135,10 @@ async def _gemini_chat(
     user_message: str,
     temperature: float,
     max_tokens: int,
+    gemini_api_key: str,
 ) -> str:
     """Call Google Gemini API as fallback."""
-    url = f"{GEMINI_URL}?key={GEMINI_API_KEY}"
+    url = f"{GEMINI_URL}?key={gemini_api_key}"
 
     payload = {
         "contents": [

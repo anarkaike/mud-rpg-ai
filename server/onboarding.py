@@ -9,7 +9,9 @@ import hashlib
 
 from . import database as db
 from . import message_formatter as fmt
+from . import room_manager as rooms
 from . import world_state
+from .image_pipeline import enqueue_room_image_generation
 from .ai_client import chat_completion_json
 
 
@@ -735,7 +737,7 @@ async def process_onboarding(phone: str, message: str) -> str:
             room_state = world_state.get_room_state("mudai.places.start")
             room_state_meta = room_state.get("metadata_parsed", {}) if room_state else {}
             if room_state_meta.get("image_refresh_needed"):
-                world_state.ensure_room_image_stub("mudai.places.start", reason="onboarding fragment")
+                await enqueue_room_image_generation("mudai.places.start", reason="onboarding fragment")
 
             # Return the first room view
             return await _build_welcome_room_response(phone)

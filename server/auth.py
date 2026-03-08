@@ -16,7 +16,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 API_TOKEN = os.environ.get("API_TOKEN", "mudai-dev-token-2026")
 
 PUBLIC_PATHS = ("/", "/auth/request-code", "/auth/verify-code")
-PUBLIC_PREFIXES = ("/p/", "/p", "/health", "/docs", "/openapi.json", "/redoc")
+PUBLIC_PREFIXES = ("/p/", "/p", "/health", "/docs", "/openapi.json", "/redoc", "/media/")
 
 
 class BearerAuthMiddleware(BaseHTTPMiddleware):

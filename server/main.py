@@ -19,6 +19,7 @@ load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from .database import init_db
 from .auth import BearerAuthMiddleware
@@ -50,6 +51,10 @@ app.include_router(artifacts.router)
 app.include_router(search.router)
 app.include_router(pages.router)
 app.include_router(game.router)
+
+generated_media_dir = os.path.join(os.path.dirname(__file__), "data", "generated")
+os.makedirs(generated_media_dir, exist_ok=True)
+app.mount("/media", StaticFiles(directory=generated_media_dir), name="media")
 
 
 @app.on_event("startup")
