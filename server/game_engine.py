@@ -178,6 +178,8 @@ async def process_action(phone: str, message: str) -> str:
                 return await _handle_look(phone, meta)
             case "profile":
                 return _handle_profile(phone, meta)
+            case "matches":
+                return _handle_social_matches(phone, meta)
             case "explore":
                 return _handle_explore(phone, meta)
             case "decorate":
@@ -206,6 +208,12 @@ async def _handle_slash_command(phone: str, msg: str) -> str:
             return _handle_reset(phone)
         case "/ajuda" | "/help":
             return _handle_help()
+        case "/conexoes" | "/conexões" | "/matches":
+            clean = _clean_phone(phone)
+            player = db.get_artifact(f"mudai.users.{clean}")
+            if not player:
+                return fmt.format_error("Você ainda não tem perfil. Envie 'oi' para começar!")
+            return _handle_social_matches(phone, player.get("metadata_parsed", {}))
         case "/sementes" | "/seeds":
             clean = _clean_phone(phone)
             player = db.get_artifact(f"mudai.users.{clean}")
@@ -231,6 +239,7 @@ async def _handle_slash_command(phone: str, msg: str) -> str:
                 f"Comando desconhecido: {cmd}\n\n"
                 "Comandos disponíveis:\n"
                 "  /ajuda — ver ajuda\n"
+                "  /conexoes — ver conexões sugeridas\n"
                 "  /sementes — seu saldo\n"
                 "  /perfil — seu personagem\n"
                 "  /salas — explorar\n"
@@ -402,10 +411,16 @@ def _handle_profile(phone: str, meta: dict) -> str:
         suggestions=[
             {"cmd": "olhar", "desc": "ver sala atual"},
             {"cmd": "salas", "desc": "explorar"},
+            {"cmd": "/conexoes", "desc": "ver pessoas compatíveis"},
             {"cmd": "/sementes", "desc": "ver como ganhar"},
         ],
         profile_url=_generate_profile_url(phone),
     )
+
+
+def _handle_social_matches(phone: str, meta: dict) -> str:
+    matches = rooms.find_social_matches(phone, limit=5)
+    return fmt.format_social_matches(matches, profile_url=_generate_profile_url(phone))
 
 
 def _handle_explore(phone: str, meta: dict) -> str:
@@ -698,6 +713,9 @@ async def _parse_action(message: str) -> dict:
         "look": {"action": "look", "target": ""},
         "perfil": {"action": "profile", "target": ""},
         "eu": {"action": "profile", "target": ""},
+        "conexoes": {"action": "matches", "target": ""},
+        "conexões": {"action": "matches", "target": ""},
+        "matches": {"action": "matches", "target": ""},
         "salas": {"action": "explore", "target": ""},
         "explorar": {"action": "explore", "target": ""},
         "ajuda": {"action": "help", "target": ""},
@@ -724,6 +742,10 @@ async def _parse_action(message: str) -> dict:
     seeds_keywords = ["semente", "moeda", "ponto", "como ganho", "como consigo", "como ganhar"]
     if any(kw in msg for kw in seeds_keywords):
         return {"action": "seeds", "target": ""}
+
+    match_keywords = ["conex", "compat", "match", "quem pode me ajudar", "com quem posso falar"]
+    if any(kw in msg for kw in match_keywords):
+        return {"action": "matches", "target": ""}
 
     # Use AI for complex messages
     try:

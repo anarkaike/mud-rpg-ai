@@ -54,6 +54,12 @@ O backend consegue transformar saídas textuais em salas reais quando o jogador 
 * **Bootstrap imediato:** a nova sala já nasce com `world_state`, missões persistentes iniciais e tags derivadas do contexto de origem.
 * **Exploração contínua:** isso reduz dependência de seed manual e permite que o mapa cresça incrementalmente a partir das conexões já descritas nos markdowns das salas.
 
+### 8. Matching Social (`server/room_manager.py` & `server/game_engine.py`)
+O backend também cruza o que cada jogador busca com o que outros jogadores oferecem, e vice-versa, para sugerir conexões potencialmente úteis.
+* **Base do score:** interseção entre `seeks` e `offers`, com bônus quando os jogadores estão na mesma sala.
+* **Acesso por comando:** o engine expõe as sugestões via `/conexoes`, `conexoes` e aliases equivalentes, sem depender da interface web.
+* **Objetivo:** incentivar conversas, trocas e afinidades reais usando os dados já coletados no onboarding e no perfil do jogador.
+
 ---
 
 ## 🚀 Fluxo de um Webhook

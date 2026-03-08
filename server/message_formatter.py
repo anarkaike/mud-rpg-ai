@@ -229,6 +229,43 @@ def format_profile(
     return "\n".join(p for p in parts if p is not None)
 
 
+def format_social_matches(matches: list[dict], profile_url: str = "") -> str:
+    lines = []
+    for match in matches[:5]:
+        room = match.get("current_room", "")
+        room_label = room.split(".")[-1].replace("_", " ").title() if room else "Em trânsito"
+        room_hint = " · mesma sala" if match.get("same_room") else f" · {room_label}"
+        lines.append(f"  ▸ *{match.get('nickname', 'Viajante')}*{room_hint}")
+        seek_matches = match.get("seek_matches", [])[:2]
+        offer_matches = match.get("offer_matches", [])[:2]
+        if seek_matches:
+            lines.append(f"     _pode te oferecer:_ {', '.join(seek_matches)}")
+        if offer_matches:
+            lines.append(f"     _pode buscar de você:_ {', '.join(offer_matches)}")
+
+    if not lines:
+        lines.append("  ▸ Ainda não achei conexões fortes com base no seu perfil.")
+        lines.append("     _Tente enriquecer o que você busca e oferece no onboarding futuro._")
+
+    parts = [
+        SEP,
+        "🤝 *CONEXÕES SUGERIDAS*",
+        SEP,
+        "",
+        "Com base no que você busca e no que pode oferecer:",
+        "",
+        "\n".join(lines),
+        "",
+        "💬 _Use isso para puxar conversa, encontrar ajuda ou oferecer algo útil._",
+    ]
+
+    if profile_url:
+        parts.append(f"\n🔗 {profile_url}")
+
+    parts.append(SEP)
+    return "\n".join(parts)
+
+
 def format_challenge(
     challenge_type: str,
     instruction: str,

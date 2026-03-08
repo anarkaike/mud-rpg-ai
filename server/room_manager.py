@@ -127,6 +127,52 @@ def get_room_info(room_path: str) -> Optional[dict]:
     return info
 
 
+def find_social_matches(phone: str, limit: int = 5) -> list[dict]:
+    clean = _clean_phone(phone)
+    player = db.get_artifact(f"mudai.users.{clean}")
+    if not player:
+        return []
+
+    meta = player.get("metadata_parsed", {})
+    seeks_terms = _tokenize_match_text(meta.get("seeks", ""))
+    offers_terms = _tokenize_match_text(meta.get("offers", ""))
+    current_room = meta.get("current_room", "")
+
+    candidates = []
+    for other in db.list_by_prefix("mudai.users.", direct_children_only=True):
+        if other["path"] == player["path"]:
+            continue
+        other_meta = other.get("metadata_parsed", {})
+        if other_meta.get("state") != "playing":
+            continue
+
+        other_seeks = _tokenize_match_text(other_meta.get("seeks", ""))
+        other_offers = _tokenize_match_text(other_meta.get("offers", ""))
+        if not (other_seeks or other_offers):
+            continue
+
+        seek_matches = sorted(seeks_terms.intersection(other_offers))
+        offer_matches = sorted(offers_terms.intersection(other_seeks))
+        score = len(seek_matches) * 3 + len(offer_matches) * 2
+        if other_meta.get("current_room") == current_room and current_room:
+            score += 2
+        if score <= 0:
+            continue
+
+        candidates.append({
+            "phone": other["path"].split(".")[-1],
+            "nickname": other_meta.get("nickname", "Viajante"),
+            "current_room": other_meta.get("current_room", ""),
+            "seek_matches": seek_matches,
+            "offer_matches": offer_matches,
+            "score": score,
+            "same_room": other_meta.get("current_room") == current_room and bool(current_room),
+        })
+
+    candidates.sort(key=lambda item: (-item["score"], item["nickname"].lower()))
+    return candidates[:limit]
+
+
 def find_room_by_name(name: str) -> Optional[str]:
     """
     Find a room path by partial name match.
@@ -340,6 +386,23 @@ def _extract_fragments(content: str) -> list[str]:
 
 def _clean_phone(phone: str) -> str:
     return "".join(c for c in phone if c.isalnum())
+
+
+def _tokenize_match_text(text: str) -> set[str]:
+    normalized = (text or "").lower()
+    normalized = normalized.replace("ç", "c")
+    normalized = normalized.replace("á", "a").replace("à", "a").replace("ã", "a").replace("â", "a")
+    normalized = normalized.replace("é", "e").replace("ê", "e")
+    normalized = normalized.replace("í", "i")
+    normalized = normalized.replace("ó", "o").replace("ô", "o").replace("õ", "o")
+    normalized = normalized.replace("ú", "u")
+    tokens = re.split(r"[^a-z0-9]+", normalized)
+    stopwords = {
+        "de", "da", "do", "das", "dos", "e", "ou", "com", "para", "por", "em", "na", "no",
+        "uma", "um", "o", "a", "as", "os", "que", "me", "eu", "quero", "busco", "ofereco",
+        "ofereço", "procuro", "ajuda", "apoio", "troca", "conexao", "conexao", "gente", "pessoas",
+    }
+    return {token for token in tokens if len(token) >= 3 and token not in stopwords}
 
 
 def _normalize_direction(direction: str) -> str:
