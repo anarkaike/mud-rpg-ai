@@ -12,6 +12,10 @@ from . import message_formatter as fmt
 from . import world_state
 
 
+MAX_GENERATED_ROOM_DEPTH = 2
+MAX_GENERATED_CHILDREN_PER_ROOM = 3
+
+
 # ─── Room Discovery ──────────────────────────────────
 
 def get_rooms_for_player(phone: str) -> list[dict]:
@@ -231,6 +235,8 @@ def materialize_room_from_exit(current_room_path: str, direction: str) -> Option
     room = db.get_artifact(current_room_path)
     if not room:
         return None
+    if not _can_expand_from_room(room):
+        return None
 
     exits = _extract_exits(room["content"])
     direction_lower = _normalize_direction(direction)
@@ -437,6 +443,30 @@ def _slugify_room_name(name: str) -> str:
     return normalized or "sala_nova"
 
 
+def _can_expand_from_room(room: dict) -> bool:
+    meta = room.get("metadata_parsed", {})
+    if not meta.get("generated"):
+        return True
+    generated_depth = int(meta.get("generated_depth", 1) or 1)
+    if generated_depth >= MAX_GENERATED_ROOM_DEPTH:
+        return False
+    generated_children_count = int(meta.get("generated_children_count", 0) or 0)
+    return generated_children_count < MAX_GENERATED_CHILDREN_PER_ROOM
+
+
+def _bump_generated_children_count(room_path: str, room: dict) -> None:
+    meta = room.get("metadata_parsed", {}).copy()
+    meta["generated_children_count"] = int(meta.get("generated_children_count", 0) or 0) + 1
+    db.put_artifact(
+        path=room_path,
+        content=room["content"],
+        content_type=room.get("content_type", "text/markdown"),
+        metadata=meta,
+        is_template=False,
+        template_source=room.get("template_source"),
+    )
+
+
 def _create_room_from_exit(current_room_path: str, direction: str, target_name: str) -> str:
     base_slug = _slugify_room_name(target_name)
     room_path = f"mudai.places.{base_slug}"
@@ -449,6 +479,8 @@ def _create_room_from_exit(current_room_path: str, direction: str, target_name: 
     source_name = _extract_room_name(source_room["content"]) if source_room else "origem"
     source_meta = source_room.get("metadata_parsed", {}) if source_room else {}
     source_tags = source_meta.get("tags", [])
+    generated_depth = int(source_meta.get("generated_depth", 0) or 0) + 1
+    generated_root_room = source_meta.get("generated_root_room") or current_room_path
     reverse_direction = _reverse_direction(direction)
     purpose = f"Extensão de {source_name.replace('🌱 ', '').replace('📝 ', '')}".strip()
     tags = list(dict.fromkeys([*source_tags[:2], "expansao", _normalize_direction(direction)]))
@@ -477,8 +509,13 @@ def _create_room_from_exit(current_room_path: str, direction: str, target_name: 
             "generated": True,
             "generated_from_room": current_room_path,
             "generated_from_direction": _normalize_direction(direction),
+            "generated_root_room": generated_root_room,
+            "generated_depth": generated_depth,
+            "generated_children_count": 0,
         },
     )
+    if source_room and source_meta.get("generated"):
+        _bump_generated_children_count(current_room_path, source_room)
     world_state.ensure_room_state(
         room_path,
         room_name=f"🚪 {target_name}",

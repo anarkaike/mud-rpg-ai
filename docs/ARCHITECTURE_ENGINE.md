@@ -53,6 +53,7 @@ O backend consegue transformar saídas textuais em salas reais quando o jogador 
 * **Materialização sob demanda:** ao seguir uma direção válida, o `room_manager` pode criar automaticamente `mudai.places.{slug}` com conteúdo mínimo, metadados e saída de retorno.
 * **Bootstrap imediato:** a nova sala já nasce com `world_state`, missões persistentes iniciais e tags derivadas do contexto de origem.
 * **Exploração contínua:** isso reduz dependência de seed manual e permite que o mapa cresça incrementalmente a partir das conexões já descritas nos markdowns das salas.
+* **Governança da expansão:** salas geradas carregam linhagem (`generated_root_room`, `generated_depth`) e respeitam limites de profundidade e quantidade de filhos para evitar crescimento descontrolado do mapa.
 
 ### 8. Matching Social (`server/room_manager.py` & `server/game_engine.py`)
 O backend também cruza o que cada jogador busca com o que outros jogadores oferecem, e vice-versa, para sugerir conexões potencialmente úteis.
