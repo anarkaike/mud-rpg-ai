@@ -252,13 +252,14 @@ def format_social_matches(matches: list[dict], profile_url: str = "") -> str:
         room_hint = " · mesma sala" if match.get("same_room") else f" · {room_label}"
         favorite_hint = " ⭐" if match.get("is_favorite") else ""
         useful_hint = " 🛠" if match.get("is_useful") else ""
+        confirmed_hint = " 🤝" if match.get("is_confirmed") else ""
         if match.get("is_new"):
             state_hint = " · nova"
         elif match.get("seen_count", 0):
             state_hint = f" · vista {match.get('seen_count')}x"
         else:
             state_hint = ""
-        lines.append(f"  ▸ *{match.get('nickname', 'Viajante')}*{favorite_hint}{useful_hint}{room_hint}{state_hint}")
+        lines.append(f"  ▸ *{match.get('nickname', 'Viajante')}*{favorite_hint}{useful_hint}{confirmed_hint}{room_hint}{state_hint}")
         seek_matches = match.get("seek_matches", [])[:2]
         offer_matches = match.get("offer_matches", [])[:2]
         shared_signals = match.get("shared_signals", [])[:2]
@@ -366,8 +367,9 @@ def format_social_match_history(history: list[dict], profile_url: str = "") -> s
         room_hint = "mesma sala" if item.get("same_room") else room_label
         favorite_hint = " ⭐" if item.get("is_favorite") else ""
         useful_hint = " 🛠" if item.get("is_useful") else ""
+        confirmed_hint = " 🤝" if item.get("is_confirmed") else ""
         lines.append(
-            f"  ▸ *{item.get('nickname', 'Viajante')}*{favorite_hint}{useful_hint} · score {item.get('score', 0)} · vista {item.get('seen_count', 0)}x"
+            f"  ▸ *{item.get('nickname', 'Viajante')}*{favorite_hint}{useful_hint}{confirmed_hint} · score {item.get('score', 0)} · vista {item.get('seen_count', 0)}x"
         )
         lines.append(f"     _{room_hint}_")
         seek_matches = item.get("seek_matches", [])[:2]
@@ -440,6 +442,23 @@ def format_social_useful_saved(match_meta: dict, profile_url: str = "") -> str:
     return "\n".join(parts)
 
 
+def format_social_confirmed_saved(match_meta: dict, profile_url: str = "") -> str:
+    nickname = match_meta.get("nickname", "Viajante")
+    parts = [
+        SEP,
+        "🤝 *CONEXÃO CONFIRMADA*",
+        SEP,
+        "",
+        f"Você confirmou *{nickname}* como um vínculo social real.",
+        "",
+        "💬 _Use /conexoes-confirmadas para revisar suas conexões já reconhecidas._",
+    ]
+    if profile_url:
+        parts.append(f"\n🔗 {profile_url}")
+    parts.append(SEP)
+    return "\n".join(parts)
+
+
 def format_favorite_social_matches(history: list[dict], profile_url: str = "") -> str:
     lines = []
     for item in history[:8]:
@@ -491,6 +510,36 @@ def format_useful_social_matches(history: list[dict], profile_url: str = "") -> 
         SEP,
         "",
         "Seus vínculos sociais mais acionáveis:",
+        "",
+        "\n".join(lines),
+    ]
+    if profile_url:
+        parts.append(f"\n🔗 {profile_url}")
+    parts.append(SEP)
+    return "\n".join(parts)
+
+
+def format_confirmed_social_matches(history: list[dict], profile_url: str = "") -> str:
+    lines = []
+    for item in history[:8]:
+        room = item.get("current_room", "")
+        room_label = room.split(".")[-1].replace("_", " ").title() if room else "Em trânsito"
+        room_hint = "mesma sala" if item.get("same_room") else room_label
+        lines.append(
+            f"  ▸ *{item.get('nickname', 'Viajante')}* · score {item.get('score', 0)} · vista {item.get('seen_count', 0)}x"
+        )
+        lines.append(f"     _{room_hint}_")
+
+    if not lines:
+        lines.append("  ▸ Você ainda não confirmou conexões sociais.")
+        lines.append("     _Use /confirmar-conexao NOME depois de ver /conexoes ou /historico-conexoes._")
+
+    parts = [
+        SEP,
+        "🤝 *CONEXÕES CONFIRMADAS*",
+        SEP,
+        "",
+        "Seus vínculos sociais já reconhecidos:",
         "",
         "\n".join(lines),
     ]

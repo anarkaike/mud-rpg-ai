@@ -237,6 +237,8 @@ def persist_social_matches(phone: str, matches: list[dict]) -> list[dict]:
             "favorited_at": existing_meta.get("favorited_at", ""),
             "is_useful": bool(existing_meta.get("is_useful", False)),
             "marked_useful_at": existing_meta.get("marked_useful_at", ""),
+            "is_confirmed": bool(existing_meta.get("is_confirmed", False)),
+            "confirmed_at": existing_meta.get("confirmed_at", ""),
             "first_seen_at": existing_meta.get("first_seen_at") or db._now(),
             "last_seen_at": db._now(),
         }
@@ -254,6 +256,7 @@ def persist_social_matches(phone: str, matches: list[dict]) -> list[dict]:
             "is_new": seen_count == 1,
             "is_favorite": artifact.get("metadata_parsed", {}).get("is_favorite", False),
             "is_useful": artifact.get("metadata_parsed", {}).get("is_useful", False),
+            "is_confirmed": artifact.get("metadata_parsed", {}).get("is_confirmed", False),
         })
 
     return persisted_matches
@@ -289,6 +292,8 @@ def list_social_match_history(phone: str, limit: int = 10) -> list[dict]:
             "favorited_at": meta.get("favorited_at", ""),
             "is_useful": bool(meta.get("is_useful", False)),
             "marked_useful_at": meta.get("marked_useful_at", ""),
+            "is_confirmed": bool(meta.get("is_confirmed", False)),
+            "confirmed_at": meta.get("confirmed_at", ""),
             "first_seen_at": meta.get("first_seen_at", ""),
             "last_seen_at": meta.get("last_seen_at", ""),
         })
@@ -360,6 +365,30 @@ def mark_social_match_useful(phone: str, query: str) -> Optional[dict]:
     return updated.get("metadata_parsed", {})
 
 
+def confirm_social_match(phone: str, query: str) -> Optional[dict]:
+    clean = _clean_phone(phone)
+    player = db.get_artifact(f"mudai.users.{clean}")
+    if not player:
+        return None
+
+    target_artifact = _find_social_match_artifact(clean, query)
+    if not target_artifact:
+        return None
+
+    meta = target_artifact.get("metadata_parsed", {}).copy()
+    meta["is_confirmed"] = True
+    meta["confirmed_at"] = meta.get("confirmed_at") or db._now()
+    updated = db.put_artifact(
+        path=target_artifact["path"],
+        content=target_artifact["content"],
+        content_type=target_artifact.get("content_type", "text/plain"),
+        metadata=meta,
+        is_template=False,
+        template_source=target_artifact.get("template_source"),
+    )
+    return updated.get("metadata_parsed", {})
+
+
 def list_favorite_social_matches(phone: str, limit: int = 10) -> list[dict]:
     history = list_social_match_history(phone, limit=100)
     favorites = [item for item in history if item.get("is_favorite")]
@@ -372,6 +401,13 @@ def list_useful_social_matches(phone: str, limit: int = 10) -> list[dict]:
     useful = [item for item in history if item.get("is_useful")]
     useful.sort(key=lambda item: (item.get("marked_useful_at", ""), item.get("last_seen_at", ""), item.get("seen_count", 0)), reverse=True)
     return useful[:limit]
+
+
+def list_confirmed_social_matches(phone: str, limit: int = 10) -> list[dict]:
+    history = list_social_match_history(phone, limit=100)
+    confirmed = [item for item in history if item.get("is_confirmed")]
+    confirmed.sort(key=lambda item: (item.get("confirmed_at", ""), item.get("last_seen_at", ""), item.get("seen_count", 0)), reverse=True)
+    return confirmed[:limit]
 
 
 def find_room_by_name(name: str) -> Optional[str]:

@@ -183,6 +183,10 @@ async def process_action(phone: str, message: str) -> str:
                 return await _handle_look(phone, meta)
             case "profile":
                 return _handle_profile(phone, meta)
+            case "social_confirmed":
+                return _handle_confirmed_social_matches(phone, meta)
+            case "confirm_social_match":
+                return _handle_confirm_social_match(phone, meta, target)
             case "social_useful":
                 return _handle_useful_social_matches(phone, meta)
             case "mark_social_useful":
@@ -223,6 +227,18 @@ async def _handle_slash_command(phone: str, msg: str) -> str:
             return _handle_reset(phone)
         case "/ajuda" | "/help":
             return _handle_help()
+        case "/conexoes-confirmadas" | "/conexões-confirmadas" | "/confirmadas-sociais":
+            clean = _clean_phone(phone)
+            player = db.get_artifact(f"mudai.users.{clean}")
+            if not player:
+                return fmt.format_error("Você ainda não tem perfil. Envie 'oi' para começar!")
+            return _handle_confirmed_social_matches(phone, player.get("metadata_parsed", {}))
+        case "/confirmar-conexao" | "/confirmar-conexão":
+            clean = _clean_phone(phone)
+            player = db.get_artifact(f"mudai.users.{clean}")
+            if not player:
+                return fmt.format_error("Você ainda não tem perfil. Envie 'oi' para começar!")
+            return _handle_confirm_social_match(phone, player.get("metadata_parsed", {}), args)
         case "/conexoes-uteis" | "/conexões-úteis" | "/uteis-sociais" | "/úteis-sociais":
             clean = _clean_phone(phone)
             player = db.get_artifact(f"mudai.users.{clean}")
@@ -285,9 +301,11 @@ async def _handle_slash_command(phone: str, msg: str) -> str:
                 "Comandos disponíveis:\n"
                 "  /ajuda — ver ajuda\n"
                 "  /conexoes — ver conexões sugeridas\n"
+                "  /confirmar-conexao NOME — confirmar vínculo\n"
+                "  /conexoes-confirmadas — ver confirmadas\n"
                 "  /marcar-conexao-util NOME — salvar conexão útil\n"
                 "  /conexoes-uteis — ver úteis\n"
-                "  /favoritar-conexao NOME — salvar conexão útil\n"
+                "  /favoritar-conexao NOME — salvar favorita\n"
                 "  /conexoes-favoritas — ver favoritas\n"
                 "  /historico-conexoes — ver memória social\n"
                 "  /sementes — seu saldo\n"
@@ -510,6 +528,7 @@ def _handle_profile(phone: str, meta: dict) -> str:
     room_name = room_info["name"] if room_info else "Desconhecido"
     badges = meta.get("badges", [])
     badge_str = " ".join(BADGES[b]["emoji"] for b in badges if b in BADGES) if badges else "nenhum ainda"
+    structured_profile = meta.get("structured_profile", {}) if isinstance(meta.get("structured_profile", {}), dict) else {}
 
     return fmt.format_profile(
         nickname=meta.get("nickname", "Anônimo"),
@@ -523,6 +542,9 @@ def _handle_profile(phone: str, meta: dict) -> str:
         offers=meta.get("offers", ""),
         rooms_visited=len(meta.get("rooms_visited", [])),
         decorations=meta.get("decorations_count", 0),
+        structured_summary=str(structured_profile.get("summary", "")).strip(),
+        structured_worlds=structured_profile.get("worlds", []) if isinstance(structured_profile.get("worlds", []), list) else [],
+        structured_strengths=structured_profile.get("strengths", []) if isinstance(structured_profile.get("strengths", []), list) else [],
         suggestions=[
             {"cmd": "olhar", "desc": "ver sala atual"},
             {"cmd": "salas", "desc": "explorar"},
@@ -542,6 +564,20 @@ def _handle_social_matches(phone: str, meta: dict) -> str:
 def _handle_social_match_history(phone: str, meta: dict) -> str:
     history = rooms.list_social_match_history(phone, limit=8)
     return fmt.format_social_match_history(history, profile_url=_generate_profile_url(phone))
+
+
+def _handle_confirm_social_match(phone: str, meta: dict, target: str) -> str:
+    if not (target or "").strip():
+        return fmt.format_error("Use /confirmar-conexao NOME para marcar alguém da sua memória social como vínculo real.")
+    saved = rooms.confirm_social_match(phone, target)
+    if not saved:
+        return fmt.format_error("Não encontrei essa conexão na sua memória social. Veja /historico-conexoes primeiro.")
+    return fmt.format_social_confirmed_saved(saved, profile_url=_generate_profile_url(phone))
+
+
+def _handle_confirmed_social_matches(phone: str, meta: dict) -> str:
+    confirmed = rooms.list_confirmed_social_matches(phone, limit=8)
+    return fmt.format_confirmed_social_matches(confirmed, profile_url=_generate_profile_url(phone))
 
 
 def _handle_mark_social_match_useful(phone: str, meta: dict, target: str) -> str:
@@ -874,6 +910,9 @@ async def _parse_action(message: str) -> dict:
         "look": {"action": "look", "target": ""},
         "perfil": {"action": "profile", "target": ""},
         "eu": {"action": "profile", "target": ""},
+        "conexoes confirmadas": {"action": "social_confirmed", "target": ""},
+        "conexões confirmadas": {"action": "social_confirmed", "target": ""},
+        "confirmadas sociais": {"action": "social_confirmed", "target": ""},
         "conexoes uteis": {"action": "social_useful", "target": ""},
         "conexões úteis": {"action": "social_useful", "target": ""},
         "uteis sociais": {"action": "social_useful", "target": ""},
@@ -918,6 +957,10 @@ async def _parse_action(message: str) -> dict:
     match_keywords = ["conex", "compat", "match", "quem pode me ajudar", "com quem posso falar"]
     if any(kw in msg for kw in match_keywords):
         return {"action": "matches", "target": ""}
+
+    confirmed_keywords = ["conexoes confirmadas", "conexões confirmadas", "confirmadas sociais"]
+    if any(kw in msg for kw in confirmed_keywords):
+        return {"action": "social_confirmed", "target": ""}
 
     useful_keywords = ["conexoes uteis", "conexões úteis", "uteis sociais", "úteis sociais"]
     if any(kw in msg for kw in useful_keywords):
