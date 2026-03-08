@@ -139,6 +139,7 @@ def get_room_info(room_path: str) -> Optional[dict]:
         "recent_contributions": snapshot.get("highlight", []),
         "image": snapshot.get("image"),
         "missions": snapshot.get("missions", []),
+        "challenges": snapshot.get("challenges", []),
     }
     return info
 

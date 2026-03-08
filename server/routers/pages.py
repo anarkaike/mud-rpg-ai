@@ -3,7 +3,7 @@ MUD-AI — Public HTML Pages Router.
 
 Renders artifacts as beautiful HTML pages, accessible without authentication.
 The AI can generate links like:
-    https://mudai.servinder.com.br/p/mudai.users.junio
+    https://mudai.servinder.com.br/p/abcd1234efgh5678
 """
 
 from fastapi import APIRouter, HTTPException, Form
@@ -19,24 +19,17 @@ router = APIRouter(tags=["pages"])
 
 
 def _build_index_html() -> str:
-    """Build the index page HTML showing rooms and players."""
+    """Build the index page HTML showing public rooms only."""
     places = db.list_by_prefix("mudai.places.", direct_children_only=True)
-    users = db.list_by_prefix("mudai.users.", direct_children_only=True)
 
     links_places = "\n".join(
         f'- [{p["path"].split(".")[-1]}](/p/{p["path"]})' for p in places
-    )
-    links_users = "\n".join(
-        f'- [{u["path"].split(".")[-1]}](/p/{u["path"]})' for u in users
     )
 
     md = f"""# 🌱 MUD-AI — Mundo
 
 ## 🏠 Salas
 {links_places or "_Nenhuma sala ainda_"}
-
-## 👤 Jogadores
-{links_users or "_Nenhum jogador ainda_"}
 
 ---
 
@@ -78,9 +71,9 @@ def _build_landing_html() -> str:
 
 Você pode navegar pelo mundo sem login, só para espiar:
 
-- [Explorar Salas e Jogadores](/p)
+- [Explorar Salas Públicas](/p)
 
-Se já recebeu um link com token pelo WhatsApp, é só abrir:
+Se você já recebeu um link com token pelo WhatsApp, é só abrir:
 
 - Cole o link direto no navegador, ou
 - Cole apenas o token abaixo para ir direto ao seu painel.
@@ -93,28 +86,13 @@ Se já recebeu um link com token pelo WhatsApp, é só abrir:
 
 ---
 
-## 🔐 Entrar com telefone + código
+## 🔐 Acesso seguro
 
-Se você já conversa com o MUD-AI pelo WhatsApp, pode entrar na versão Web assim:
+Para proteger sua privacidade, a entrada web pública usa links e tokens temporários.
 
-1. Peça um código rápido para seu número.
-2. Confira o código recebido no WhatsApp.
-3. Digite telefone + código para entrar.
-
-<form method="post" action="/auth/request-code" style="margin-top: 1.5rem;">
-  <label for="phone-request">Seu telefone (com DDI)</label><br/>
-  <input id="phone-request" name="phone" placeholder="+5511999999999" style="margin-top: 0.25rem; padding: 0.4rem 0.6rem; width: 220px;" />
-  <button type="submit" style="padding: 0.4rem 0.8rem; margin-left: 0.5rem;">Pedir código</button>
-</form>
-
-<form method="post" action="/auth/verify-code" style="margin-top: 1rem;">
-  <label for="phone-verify">Telefone</label><br/>
-  <input id="phone-verify" name="phone" placeholder="+5511999999999" style="margin-top: 0.25rem; padding: 0.4rem 0.6rem; width: 220px;" />
-  <br/>
-  <label for="code" style="margin-top: 0.75rem; display:inline-block;">Código recebido</label><br/>
-  <input id="code" name="code" maxlength="6" style="margin-top: 0.25rem; padding: 0.4rem 0.6rem; width: 120px;" />
-  <button type="submit" style="padding: 0.4rem 0.8rem; margin-left: 0.5rem;">Entrar</button>
-</form>
+- Peça o link seguro no WhatsApp
+- Ou cole acima o token que você recebeu
+- Evite compartilhar esse link com outras pessoas
 
 ---
 
@@ -162,6 +140,7 @@ def _build_player_state(artifact: dict) -> dict:
         "level": meta.get("level", 1),
         "current_room": meta.get("current_room", ""),
         "active_challenge": meta.get("active_challenge"),
+        "completed_challenge_ids": meta.get("completed_challenge_ids", []),
         "mission_progress": meta.get("mission_progress", {}),
         "profile_signals": meta.get("profile_signals", {}),
         "structured_profile": meta.get("structured_profile", {}),
@@ -309,6 +288,9 @@ async def render_page(path: str):
     """
     if not path or path.strip() == "":
         return HTMLResponse(content=_build_index_html())
+
+    if path.startswith("mudai.users."):
+        raise HTTPException(status_code=404, detail="Page not found")
 
     # 1. Try direct path first
     artifact = db.get_artifact(path)

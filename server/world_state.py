@@ -27,6 +27,10 @@ def room_missions_prefix(room_path: str) -> str:
     return f"mudai.world.rooms.{room_slug(room_path)}.missions."
 
 
+def room_challenges_prefix(room_path: str) -> str:
+    return f"mudai.world.rooms.{room_slug(room_path)}.challenges."
+
+
 def response_memory_path(scope: str) -> str:
     normalized = re.sub(r"[^a-zA-Z0-9_.-]", "_", scope.strip().lower())
     return f"mudai.world.memory.responses.{normalized}"
@@ -92,6 +96,23 @@ def list_room_missions(room_path: str, limit: int = 6) -> list[dict]:
     return missions[:limit]
 
 
+def list_room_challenges(room_path: str, limit: int = 20, include_archived: bool = False) -> list[dict]:
+    challenges = db.list_by_prefix(room_challenges_prefix(room_path), direct_children_only=True)
+    if not include_archived:
+        challenges = [
+            challenge for challenge in challenges
+            if challenge.get("metadata_parsed", {}).get("status", "active") == "active"
+        ]
+    challenges.sort(
+        key=lambda challenge: (
+            float(challenge.get("metadata_parsed", {}).get("relevance_score", 0) or 0),
+            challenge.get("updated_at", ""),
+        ),
+        reverse=True,
+    )
+    return challenges[:limit]
+
+
 def ensure_room_missions(room_path: str, room_name: str = "", purpose: str = "", tags: Optional[list[str]] = None) -> list[dict]:
     existing = db.list_by_prefix(room_missions_prefix(room_path), direct_children_only=True)
     if existing:
@@ -149,7 +170,140 @@ def get_player_room_mission(room_path: str, player_meta: dict) -> Optional[dict]
         if room_progress.get(mission_id, {}).get("status") == "completed":
             continue
         return mission
-    return missions[0] if missions else None
+    return None
+
+
+def get_room_challenge(room_path: str, challenge_id: str) -> Optional[dict]:
+    if not challenge_id:
+        return None
+    return db.get_artifact(f"{room_challenges_prefix(room_path)}{challenge_id}")
+
+
+def create_room_challenge(
+    room_path: str,
+    title: str,
+    instruction: str,
+    challenge_type: str,
+    reward_seeds: int,
+    source: str = "dynamic_challenge",
+    novelty_key: str = "",
+    prompt_fingerprint: str = "",
+    generator_version: int = 1,
+    relevance_score: float = 0.0,
+    created_from_block_ids: Optional[list[str]] = None,
+    created_from_recent_players: Optional[list[str]] = None,
+) -> dict:
+    normalized_instruction = normalize_text(instruction)
+    normalized_title = normalize_text(title) or challenge_type.title()
+    challenge_id = hashlib.sha256(f"{room_path}:{normalized_title}:{normalized_instruction}".encode()).hexdigest()[:12]
+    path = f"{room_challenges_prefix(room_path)}{challenge_id}"
+    existing = db.get_artifact(path)
+    if existing:
+        return existing
+    return db.put_artifact(
+        path=path,
+        content=normalized_instruction,
+        metadata={
+            "id": challenge_id,
+            "room_path": room_path,
+            "title": normalized_title,
+            "instruction": normalized_instruction,
+            "challenge_type": challenge_type,
+            "reward_seeds": reward_seeds,
+            "status": "active",
+            "source": source,
+            "novelty_key": novelty_key or challenge_id,
+            "prompt_fingerprint": prompt_fingerprint,
+            "generator_version": generator_version,
+            "relevance_score": float(relevance_score or 0.0),
+            "created_from_block_ids": list(created_from_block_ids or [])[:8],
+            "created_from_recent_players": list(dict.fromkeys(created_from_recent_players or []))[:8],
+            "last_5_response_block_ids": [],
+            "last_5_responses": [],
+            "response_count": 0,
+            "completion_count": 0,
+        },
+    )
+
+
+def touch_room_challenge(room_path: str, challenge_id: str, metadata_updates: dict) -> Optional[dict]:
+    challenge = get_room_challenge(room_path, challenge_id)
+    if not challenge:
+        return None
+    metadata = challenge.get("metadata_parsed", {}).copy()
+    metadata.update(metadata_updates)
+    return db.put_artifact(path=challenge["path"], content=challenge.get("content", ""), metadata=metadata)
+
+
+def archive_room_challenge(room_path: str, challenge_id: str, reason: str = "") -> Optional[dict]:
+    return touch_room_challenge(room_path, challenge_id, {"status": "archived", "archive_reason": normalize_text(reason)[:180]})
+
+
+def register_challenge_response(room_path: str, challenge_id: str, block: dict) -> Optional[dict]:
+    challenge = get_room_challenge(room_path, challenge_id)
+    if not challenge:
+        return None
+    metadata = challenge.get("metadata_parsed", {}).copy()
+    block_meta = block.get("metadata_parsed", {})
+    block_id = block_meta.get("id", "")
+    excerpt = truncate(block.get("content", ""), 180)
+    responses = metadata.get("last_5_responses", []) if isinstance(metadata.get("last_5_responses", []), list) else []
+    response_ids = metadata.get("last_5_response_block_ids", []) if isinstance(metadata.get("last_5_response_block_ids", []), list) else []
+    if block_id:
+        response_ids = [item for item in response_ids if item != block_id]
+        response_ids.insert(0, block_id)
+    if excerpt:
+        payload = {
+            "block_id": block_id,
+            "excerpt": excerpt,
+            "flavor": block_meta.get("flavor", "generic"),
+            "type": block_meta.get("block_type", "challenge_response"),
+        }
+        responses = [item for item in responses if item.get("block_id") != block_id]
+        responses.insert(0, payload)
+    metadata["last_5_response_block_ids"] = response_ids[:5]
+    metadata["last_5_responses"] = responses[:5]
+    metadata["response_count"] = int(metadata.get("response_count", 0) or 0) + 1
+    metadata["completion_count"] = int(metadata.get("completion_count", 0) or 0) + 1
+    return db.put_artifact(path=challenge["path"], content=challenge.get("content", ""), metadata=metadata)
+
+
+def build_room_challenge_context(room_path: str) -> dict:
+    state = ensure_room_state(room_path)
+    state_meta = state.get("metadata_parsed", {})
+    blocks = list_room_blocks(room_path, limit=12)
+    challenges = list_room_challenges(room_path, limit=12, include_archived=True)
+    recent_players = list(dict.fromkeys(state_meta.get("recent_authors", [])))[:6]
+    recent_challenge_responses = []
+    for block in blocks:
+        block_meta = block.get("metadata_parsed", {})
+        if block_meta.get("block_type") in {"challenge_response", "mission_response"}:
+            recent_challenge_responses.append(truncate(block.get("content", ""), 160))
+    return {
+        "room_path": room_path,
+        "room_name": state_meta.get("room_name", room_path),
+        "purpose": state_meta.get("purpose", ""),
+        "tags": state_meta.get("tags", []),
+        "motifs": state_meta.get("motifs", []),
+        "evolving_summary": state_meta.get("evolving_summary", ""),
+        "last_consequence_summary": state_meta.get("last_consequence_summary", ""),
+        "social_heat": int(state_meta.get("social_heat", 0) or 0),
+        "momentum_score": int(state_meta.get("momentum_score", 0) or 0),
+        "poetic_echoes": int(state_meta.get("poetic_echoes", 0) or 0),
+        "exchange_offers": int(state_meta.get("exchange_offers", 0) or 0),
+        "exchange_requests": int(state_meta.get("exchange_requests", 0) or 0),
+        "support_echoes": int(state_meta.get("support_echoes", 0) or 0),
+        "last_block_flavor": state_meta.get("last_block_flavor", ""),
+        "recent_blocks": [truncate(block.get("content", ""), 160) for block in blocks[:6] if block.get("content")],
+        "recent_players": recent_players,
+        "recent_challenge_responses": recent_challenge_responses[:6],
+        "existing_challenges": [challenge.get("metadata_parsed", {}) for challenge in challenges[:8]],
+        "existing_novelty_keys": [
+            challenge.get("metadata_parsed", {}).get("novelty_key", "")
+            for challenge in challenges[:12]
+            if challenge.get("metadata_parsed", {}).get("novelty_key")
+        ],
+    }
 
 
 def complete_room_mission(room_path: str, mission_id: str, player_phone: str, player_name: str) -> Optional[dict]:
@@ -334,14 +488,16 @@ def room_dynamic_snapshot(room_path: str) -> dict:
     all_images_artifacts = list_room_images(room_path, limit=12)
     all_images = [img.get("metadata_parsed", {}) for img in all_images_artifacts]
     missions = [mission.get("metadata_parsed", {}) for mission in list_room_missions(room_path, limit=4)]
+    challenges = [challenge.get("metadata_parsed", {}) for challenge in list_room_challenges(room_path, limit=20)]
 
-    enriched_meta = {**meta, "all_images": all_images, "missions": missions}
+    enriched_meta = {**meta, "all_images": all_images, "missions": missions, "challenges": challenges}
 
     return {
         "state": enriched_meta,
         "highlight": meta.get("recent_contributions", [])[:3],
         "image": image.get("metadata_parsed", {}) if image else None,
         "missions": missions,
+        "challenges": challenges,
     }
 
 
@@ -507,6 +663,7 @@ def _refresh_room_state(room_path: str) -> dict:
 
     missions = list_room_missions(room_path, limit=6)
     mission_meta = [mission.get("metadata_parsed", {}) for mission in missions]
+    challenge_meta = [challenge.get("metadata_parsed", {}) for challenge in list_room_challenges(room_path, limit=20)]
 
     state_meta.update({
         "state_version": int(state_meta.get("state_version", 0)) + 1,
@@ -521,6 +678,8 @@ def _refresh_room_state(room_path: str) -> dict:
         "image_pool_size": len(list_room_images(room_path)),
         "active_missions": mission_meta,
         "mission_count": len(mission_meta),
+        "active_challenges": challenge_meta,
+        "challenge_count": len(challenge_meta),
         "image_refresh_needed": should_refresh_images(state_meta, blocks, visual_summary),
         "momentum_score": max(int(state_meta.get("momentum_score", 0) or 0), len(blocks)),
     })

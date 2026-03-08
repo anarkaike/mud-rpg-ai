@@ -195,9 +195,16 @@ async def get_player_state(phone: str):
         style_notes = f"{style_notes} Considere também: {structured_profile_context['communication_style']}."
 
     return {
-        "phone": phone,
-        "player": player,
+        "player": {
+            "nickname": meta.get("nickname", "Viajante"),
+            "seeds": meta.get("seeds", 0),
+            "level": meta.get("level", 1),
+            "current_room": current_room_path,
+            "completed_challenges": int(meta.get("completed_challenges", 0) or 0),
+            "completed_missions": int(meta.get("completed_missions", 0) or 0),
+        },
         "active_challenge": meta.get("active_challenge"),
+        "completed_challenge_ids": meta.get("completed_challenge_ids", []),
         "mission_progress": meta.get("mission_progress", {}),
         "profile_signals": profile_signals,
         "structured_profile": structured_profile,
@@ -216,6 +223,7 @@ async def get_player_state(phone: str):
         "current_room_blocks": world_state.list_room_blocks(current_room_path, limit=8) if current_room_path else [],
         "current_room_images": world_state.list_room_images(current_room_path, limit=8) if current_room_path else [],
         "current_room_missions": world_state.list_room_missions(current_room_path, limit=8) if current_room_path else [],
+        "current_room_challenges": world_state.list_room_challenges(current_room_path, limit=12) if current_room_path else [],
         "available_rooms": [
             {
                 "path": r["path"],
@@ -246,5 +254,6 @@ async def get_room_world_state(room_path: str):
         "blocks": world_state.list_room_blocks(room_path, limit=20),
         "images": world_state.list_room_images(room_path, limit=20),
         "missions": world_state.list_room_missions(room_path, limit=20),
+        "challenges": world_state.list_room_challenges(room_path, limit=20),
         "snapshot": world_state.room_dynamic_snapshot(room_path),
     }

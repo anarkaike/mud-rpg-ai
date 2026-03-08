@@ -65,6 +65,7 @@ def render_markdown_to_html(
     html_body = md.convert(content)
 
     mission_panel_html = ""
+    challenge_panel_html = ""
 
     # If we have room state, handle images, gallery and echoes
     if room_state:
@@ -158,6 +159,66 @@ def render_markdown_to_html(
             </div>
             """
 
+        challenges = meta.get("challenges", room_state.get("challenges", []))
+        if challenges:
+            active_challenge = {}
+            completed_challenge_ids = set()
+            if player_state:
+                active_challenge = player_state.get("active_challenge") or {}
+                completed_items = player_state.get("completed_challenge_ids", [])
+                if isinstance(completed_items, list):
+                    completed_challenge_ids = {str(item) for item in completed_items if item}
+
+            challenge_cards = []
+            for challenge in challenges[:12]:
+                challenge_id = challenge.get("id", "")
+                title_text = html.escape(challenge.get("title", "Desafio"))
+                instruction = html.escape(challenge.get("instruction", ""))
+                challenge_type = html.escape(challenge.get("challenge_type", challenge.get("type", "desafio")))
+                reward = challenge.get("reward_seeds", 0)
+                responses = challenge.get("last_5_responses", []) if isinstance(challenge.get("last_5_responses", []), list) else []
+                response_count = int(challenge.get("response_count", 0) or 0)
+                is_completed = challenge_id in completed_challenge_ids
+                is_active = active_challenge.get("id") == challenge_id and not active_challenge.get("mission_id")
+                status_label = "Concluído por você" if is_completed else "Ativo agora" if is_active else "Disponível"
+                status_class = "completed" if is_completed else "active" if is_active else "available"
+                responses_html = ""
+                if responses:
+                    response_items = "".join(
+                        f'<li><em>"{html.escape(str(item.get("excerpt", "") or ""))}"</em></li>'
+                        for item in responses[:5]
+                        if str(item.get("excerpt", "") or "").strip()
+                    )
+                    if response_items:
+                        responses_html = f"""
+                        <div class="challenge-responses">
+                            <div class="challenge-responses-header">Últimas respostas anônimas</div>
+                            <ul>{response_items}</ul>
+                        </div>
+                        """
+                challenge_cards.append(f"""
+                <div class="mission-card {status_class}">
+                    <div class="mission-card-header">
+                        <div class="mission-title">⚡ {title_text}</div>
+                        <div class="mission-status {status_class}">{status_label}</div>
+                    </div>
+                    <div class="mission-instruction">{instruction}</div>
+                    <div class="mission-meta">
+                        <span>🏷️ {challenge_type}</span>
+                        <span>🪙 {reward} sementes</span>
+                        <span>💬 {response_count} respostas</span>
+                    </div>
+                    {responses_html}
+                </div>
+                """)
+
+            challenge_panel_html = f"""
+            <div id="challenge-panel" class="mission-panel">
+                <div class="mission-panel-header">⚡ DESAFIOS DA SALA</div>
+                <div class="mission-panel-list">{''.join(challenge_cards)}</div>
+            </div>
+            """
+
         # 5. Handle Game Log / System Messages
         game_log = meta.get("game_log", [])
         if game_log:
@@ -232,21 +293,30 @@ def render_markdown_to_html(
                 {mission_panel_html.split('>', 1)[1].rsplit('</div>', 1)[0]}
             </div>
             """
+
+        challenge_panel_oob = ""
+        if challenge_panel_html:
+            challenge_panel_oob = f"""
+            <div id="challenge-panel" hx-swap-oob="true" class="mission-panel">
+                {challenge_panel_html.split('>', 1)[1].rsplit('</div>', 1)[0]}
+            </div>
+            """
             
         return f"""
         {player_bar_oob}
         {players_sidebar_oob}
         {mission_panel_oob}
+        {challenge_panel_oob}
         <div class="breadcrumb">
             {_path_to_breadcrumb(path)}
         </div>
         {html_body}
         """
 
-    return _wrap_in_template(html_body, title, path, player_stats=player_stats, players_here=players_here, mission_panel_html=mission_panel_html)
+    return _wrap_in_template(html_body, title, path, player_stats=player_stats, players_here=players_here, mission_panel_html=mission_panel_html, challenge_panel_html=challenge_panel_html)
 
 
-def _wrap_in_template(body_html: str, title: str, path: str, player_stats: Optional[dict] = None, players_here: Optional[list[dict]] = None, mission_panel_html: str = "") -> str:
+def _wrap_in_template(body_html: str, title: str, path: str, player_stats: Optional[dict] = None, players_here: Optional[list[dict]] = None, mission_panel_html: str = "", challenge_panel_html: str = "") -> str:
     """Wrap HTML body in a premium dark-themed page with glassmorphism."""
     # Check if we have a session token (16-char path)
     session_token = path if len(path) == 16 else None
@@ -299,7 +369,7 @@ def _wrap_in_template(body_html: str, title: str, path: str, player_stats: Optio
         </div>
         """
 
-    mission_sidebar_html = mission_panel_html
+    mission_sidebar_html = mission_panel_html + challenge_panel_html
 
     terminal_html = ""
     polling_attrs = ""
@@ -741,6 +811,34 @@ def _wrap_in_template(body_html: str, title: str, path: str, player_stats: Optio
             margin-top: 1rem;
             color: var(--text-muted);
             font-size: 0.85rem;
+        }}
+
+        .challenge-responses {{
+            margin-top: 0.9rem;
+            padding-top: 0.85rem;
+            border-top: 1px dashed var(--border);
+        }}
+
+        .challenge-responses-header {{
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            margin-bottom: 0.6rem;
+        }}
+
+        .challenge-responses ul {{
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 0.55rem;
+        }}
+
+        .challenge-responses li {{
+            color: var(--text-secondary);
+            font-size: 0.9rem;
         }}
 
         /* Game Log / Notifications */

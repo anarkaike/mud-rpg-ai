@@ -101,6 +101,34 @@ Contexto:
 Gere APENAS a frase narrativa."""
 
 
+CHALLENGE_GENERATOR_PROMPT = """Você cria desafios dinâmicos para uma sala viva de um RPG textual.
+
+Objetivo:
+- Gerar desafios curtos, diversos e acionáveis.
+- NÃO repetir semanticamente desafios existentes.
+- Considerar o clima da sala, respostas recentes, perfil do jogador e sinais sociais do momento.
+
+Responda APENAS com JSON no formato:
+{
+  "challenges": [
+    {
+      "title": "...",
+      "instruction": "...",
+      "challenge_type": "reflexão|perspectiva|história|troca|decoração|apoio|insight",
+      "novelty_key": "slug-curto-unico",
+      "relevance_score": 0.0
+    }
+  ]
+}
+
+Regras:
+- Cada instruction deve caber em 1 ou 2 frases curtas.
+- Evite desafios genéricos demais.
+- Evite repetir novelty_key ou ideia central fornecida no contexto.
+- Gere entre 2 e 4 desafios quando possível.
+"""
+
+
 CHAT_PROMPT = """Você é o guia do MUD-AI, um RPG textual via WhatsApp.
 Seu nome é CultivIA. Responda de forma direta, útil e amigável.
 
@@ -622,7 +650,7 @@ async def _handle_look(phone: str, meta: dict) -> str:
         breadcrumb=room_info["name"].replace("🌱 ", "").replace("📝 ", ""),
         profile_url=_generate_profile_url(phone),
     )
-    return _attach_room_challenge(phone, meta, room_info, response, trigger="look")
+    return await _attach_room_challenge(phone, meta, room_info, response, trigger="look")
 
 
 def _handle_profile(phone: str, meta: dict) -> str:
@@ -991,7 +1019,7 @@ def _looks_like_direct_decoration_intent(message: str) -> bool:
     if not text or _looks_like_decor_question(message):
         return False
     imperative_starts = (
-        "decorar", "decoração", "adicione", "adiciona", "adicionar", "coloque", "coloca",
+        "decorar", "decorar:", "adicione", "adiciona", "adicionar", "coloque", "coloca",
         "botar", "bota", "ponha", "põe", "por ", "crie ", "criar ", "quero adicionar",
         "quero colocar", "quero botar", "quero pôr", "quero por"
     )
@@ -1810,10 +1838,10 @@ def _generate_profile_url(phone: str) -> str:
     return f"{base_url}/p/{token}"
 
 
-def _attach_room_challenge(phone: str, meta: dict, room_info: dict | None, response: str, trigger: str) -> str:
+async def _attach_room_challenge(phone: str, meta: dict, room_info: dict | None, response: str, trigger: str) -> str:
     if not room_info:
         return response
-    challenge = _ensure_active_challenge(phone, meta, room_info, trigger=trigger)
+    challenge = await _ensure_active_challenge(phone, meta, room_info, trigger=trigger)
     if not challenge:
         return response
     challenge_text = fmt.format_challenge(
@@ -1831,17 +1859,32 @@ def _ensure_active_challenge(phone: str, meta: dict, room_info: dict, trigger: s
     current_room = room_info.get("path")
     active = meta.get("active_challenge")
     if active and active.get("status") == "active" and active.get("room_path") == current_room:
-        return active
+        if active.get("mission_id"):
+            return active
+        persisted = world_state.get_room_challenge(current_room, active.get("id", ""))
+        persisted_meta = persisted.get("metadata_parsed", {}) if persisted else {}
+        if persisted_meta.get("status", "active") == "active":
+            return _serialize_room_challenge(persisted_meta, room_info)
+        _update_meta(phone, {"active_challenge": None})
     if trigger == "move" and active and active.get("status") == "active":
         return None
 
     mission = world_state.get_player_room_mission(current_room, meta)
-    challenge = _build_room_mission_challenge(mission, meta) if mission else _build_room_challenge(room_info, meta)
+    if mission:
+        challenge = _build_room_mission_challenge(mission, meta)
+    else:
+        _ensure_room_challenge_pool(room_info, meta)
+        challenge = _select_room_challenge_for_player(room_info, meta)
     if not challenge:
         return None
+    seen_ids = list(_seen_challenge_ids(meta))
+    challenge_id = str(challenge.get("id", "") or "")
+    if challenge_id and challenge_id not in seen_ids:
+        seen_ids.append(challenge_id)
     _update_meta(phone, {
         "active_challenge": challenge,
         "last_challenge_room": current_room,
+        "seen_challenge_ids": seen_ids[-40:],
     })
     return challenge
 
@@ -1894,11 +1937,13 @@ def _build_room_challenge(room_info: dict, player_meta: dict | None = None) -> d
         "id": challenge_id,
         "room_path": room_path,
         "room_name": room_name,
+        "title": f"Pulso de {room_name.replace('🌱 ', '').replace('📝 ', '').strip() or 'Sala'}",
         "type": challenge_type,
         "instruction": instruction,
         "reward_seeds": SEEDS_REWARDS["challenge"],
         "status": "active",
         "source": "dynamic_challenge",
+        "novelty_key": f"fallback-{challenge_type}-{challenge_id[:6]}",
     }
 
 
@@ -1938,7 +1983,217 @@ def _build_room_mission_challenge(mission: dict | None, player_meta: dict | None
         "reward_seeds": meta.get("reward_seeds", SEEDS_REWARDS["challenge"]),
         "status": "active",
         "source": "room_mission",
+        "novelty_key": f"mission-{mission_id}",
     }
+
+
+def _completed_challenge_ids(meta: dict) -> set[str]:
+    items = meta.get("completed_challenge_ids", [])
+    if not isinstance(items, list):
+        return set()
+    return {str(item) for item in items if item}
+
+
+def _completed_challenge_novelty_keys(meta: dict) -> set[str]:
+    items = meta.get("completed_challenge_novelty_keys", [])
+    if not isinstance(items, list):
+        return set()
+    return {str(item) for item in items if item}
+
+
+def _seen_challenge_ids(meta: dict) -> set[str]:
+    items = meta.get("seen_challenge_ids", [])
+    if not isinstance(items, list):
+        return set()
+    return {str(item) for item in items if item}
+
+
+def _challenge_type_label(challenge_type: str) -> str:
+    mapping = {
+        "reflexão": "reflexão",
+        "perspectiva": "perspectiva",
+        "história": "história",
+        "troca": "troca",
+        "decoração": "decoração",
+        "apoio": "apoio",
+        "insight": "insight",
+    }
+    return mapping.get(challenge_type, challenge_type or "desafio")
+
+
+def _serialize_room_challenge(challenge_meta: dict, room_info: dict | None = None) -> dict:
+    room_name = challenge_meta.get("room_name") or (room_info or {}).get("name", "Sala")
+    return {
+        "id": challenge_meta.get("id", ""),
+        "room_path": challenge_meta.get("room_path", (room_info or {}).get("path", "")),
+        "room_name": room_name,
+        "title": challenge_meta.get("title", "Desafio"),
+        "type": _challenge_type_label(str(challenge_meta.get("challenge_type", "reflexão") or "reflexão")),
+        "instruction": challenge_meta.get("instruction", ""),
+        "reward_seeds": int(challenge_meta.get("reward_seeds", SEEDS_REWARDS["challenge"]) or SEEDS_REWARDS["challenge"]),
+        "status": challenge_meta.get("status", "active"),
+        "source": challenge_meta.get("source", "dynamic_challenge"),
+        "novelty_key": challenge_meta.get("novelty_key", challenge_meta.get("id", "")),
+        "response_count": int(challenge_meta.get("response_count", 0) or 0),
+        "completion_count": int(challenge_meta.get("completion_count", 0) or 0),
+    }
+
+
+def _build_challenge_generation_input(room_info: dict, player_meta: dict | None = None) -> str:
+    context = world_state.build_room_challenge_context(room_info.get("path", ""))
+    structured_profile = _build_structured_profile_context(player_meta or {})
+    normalized_signals = ((player_meta or {}).get("profile_signals", {}) or {}).get("normalized", {})
+    signal_pairs = [f"{key}:{round(float(value or 0.0), 2)}" for key, value in normalized_signals.items()]
+    return "\n".join([
+        f"Sala: {context.get('room_name', room_info.get('name', 'Sala'))}",
+        f"Propósito: {context.get('purpose', room_info.get('purpose', ''))}",
+        f"Tags: {', '.join(context.get('tags', [])) or 'nenhuma'}",
+        f"Motifs: {', '.join(context.get('motifs', [])) or 'nenhum'}",
+        f"Resumo vivo: {context.get('evolving_summary', room_info.get('evolving_summary', '')) or 'sem resumo'}",
+        f"Consequência recente: {context.get('last_consequence_summary', room_info.get('last_consequence_summary', '')) or 'nenhuma'}",
+        f"Temperatura social: {context.get('social_heat', 0)}",
+        f"Momentum: {context.get('momentum_score', 0)}",
+        f"Últimos ecos: {' | '.join(context.get('recent_blocks', [])) or 'nenhum'}",
+        f"Últimas respostas de desafios: {' | '.join(context.get('recent_challenge_responses', [])) or 'nenhuma'}",
+        f"Desafios existentes: {' | '.join([item.get('title', '') + ': ' + item.get('instruction', '') for item in context.get('existing_challenges', [])[:6]]) or 'nenhum'}",
+        f"Novelty keys existentes: {', '.join(context.get('existing_novelty_keys', [])) or 'nenhuma'}",
+        f"Resumo do jogador: {structured_profile.get('summary', 'sem resumo')}",
+        f"Momento do jogador: {structured_profile.get('current_moment', 'não identificado')}",
+        f"Sinais do jogador: {', '.join(signal_pairs) or 'nenhum'}",
+    ])
+
+
+def _fallback_room_challenge_specs(room_info: dict, player_meta: dict | None = None) -> list[dict]:
+    base = _build_room_challenge(room_info, player_meta)
+    if not base:
+        return []
+    room_name = room_info.get("name", "Sala")
+    motifs = room_info.get("motifs", [])[:3]
+    motif_text = ", ".join(motifs) if motifs else room_name
+    purpose = room_info.get("purpose", room_name)
+    slug = world_state.room_slug(room_info.get("path", "mudai.places.room"))
+    return [
+        {
+            "title": base.get("title", "Pulso da sala"),
+            "instruction": base.get("instruction", "Deixe uma frase curta dizendo o que este lugar desperta em você."),
+            "challenge_type": base.get("type", "reflexão"),
+            "novelty_key": base.get("novelty_key", f"fallback-{slug}-base"),
+            "relevance_score": 0.72,
+        },
+        {
+            "title": f"Ecos de {room_name}",
+            "instruction": f"Responda em 1 frase a algo que a sala está puxando agora: {motif_text}.",
+            "challenge_type": "perspectiva",
+            "novelty_key": f"echo-{slug}-{hashlib.sha256(motif_text.encode()).hexdigest()[:6]}",
+            "relevance_score": 0.68,
+        },
+        {
+            "title": f"Próximo gesto em {room_name}",
+            "instruction": f"Em 1 frase útil, diga algo que fortaleceria o propósito desta sala: {purpose}.",
+            "challenge_type": "insight",
+            "novelty_key": f"purpose-{slug}-{hashlib.sha256(purpose.encode()).hexdigest()[:6]}",
+            "relevance_score": 0.64,
+        },
+    ]
+
+
+async def _generate_dynamic_room_challenge_specs(room_info: dict, player_meta: dict | None = None) -> list[dict]:
+    fallback = _fallback_room_challenge_specs(room_info, player_meta)
+    try:
+        result = await chat_completion_json(
+            system_prompt=CHALLENGE_GENERATOR_PROMPT,
+            user_message=_build_challenge_generation_input(room_info, player_meta),
+            temperature=0.45,
+            max_tokens=700,
+        )
+    except Exception:
+        return fallback
+    items = result.get("challenges", []) if isinstance(result, dict) else []
+    if not isinstance(items, list) or not items:
+        return fallback
+    return _normalize_generated_challenge_specs(items, room_info, player_meta) or fallback
+
+
+def _normalize_generated_challenge_specs(items: list[dict], room_info: dict, player_meta: dict | None = None) -> list[dict]:
+    normalized = []
+    existing_novelty_keys = set(world_state.build_room_challenge_context(room_info.get("path", "")).get("existing_novelty_keys", []))
+    for item in items:
+        title = str(item.get("title", "") or "").strip()
+        instruction = str(item.get("instruction", "") or "").strip()
+        challenge_type = _challenge_type_label(str(item.get("challenge_type", "reflexão") or "reflexão"))
+        novelty_key = str(item.get("novelty_key", "") or "").strip().lower()
+        relevance_score = float(item.get("relevance_score", 0.0) or 0.0)
+        if not instruction:
+            continue
+        if not title:
+            title = f"Pulso de {(room_info.get('name', 'Sala')).replace('🌱 ', '').replace('📝 ', '').strip() or 'Sala'}"
+        if not novelty_key:
+            novelty_key = hashlib.sha256(f"{room_info.get('path', '')}:{title}:{instruction}".encode()).hexdigest()[:12]
+        if novelty_key in existing_novelty_keys:
+            continue
+        normalized.append({
+            "title": title,
+            "instruction": instruction,
+            "challenge_type": challenge_type,
+            "novelty_key": novelty_key,
+            "relevance_score": relevance_score,
+        })
+        existing_novelty_keys.add(novelty_key)
+    return normalized
+
+
+def _ensure_room_challenge_pool(room_info: dict, player_meta: dict | None = None, min_active: int = 6) -> list[dict]:
+    room_path = room_info.get("path", "")
+    active = world_state.list_room_challenges(room_path, limit=50)
+    if len(active) >= min_active:
+        return active
+    specs = _fallback_room_challenge_specs(room_info, player_meta)
+    specs = _normalize_generated_challenge_specs(specs, room_info, player_meta)
+    context = world_state.build_room_challenge_context(room_path)
+    for spec in specs:
+        world_state.create_room_challenge(
+            room_path=room_path,
+            title=spec["title"],
+            instruction=spec["instruction"],
+            challenge_type=spec["challenge_type"],
+            reward_seeds=SEEDS_REWARDS["challenge"],
+            source="dynamic_challenge",
+            novelty_key=spec["novelty_key"],
+            prompt_fingerprint=hashlib.sha256(_build_challenge_generation_input(room_info, player_meta).encode()).hexdigest()[:16],
+            generator_version=1,
+            relevance_score=spec.get("relevance_score", 0.5),
+            created_from_block_ids=[item.get("id", "") for item in room_info.get("recent_contributions", [])[:6] if item.get("id")],
+            created_from_recent_players=context.get("recent_players", []),
+        )
+    world_state.refresh_room_state(room_path)
+    return world_state.list_room_challenges(room_path, limit=50)
+
+
+def _select_room_challenge_for_player(room_info: dict, meta: dict) -> dict | None:
+    room_path = room_info.get("path", "")
+    challenges = world_state.list_room_challenges(room_path, limit=50)
+    completed_ids = _completed_challenge_ids(meta)
+    completed_novelty = _completed_challenge_novelty_keys(meta)
+    seen_ids = _seen_challenge_ids(meta)
+    scored = []
+    for challenge in challenges:
+        challenge_meta = challenge.get("metadata_parsed", {})
+        challenge_id = str(challenge_meta.get("id", "") or "")
+        novelty_key = str(challenge_meta.get("novelty_key", challenge_id) or challenge_id)
+        if not challenge_id or challenge_meta.get("status") != "active":
+            continue
+        if challenge_id in completed_ids or novelty_key in completed_novelty:
+            continue
+        score = float(challenge_meta.get("relevance_score", 0) or 0)
+        if challenge_id in seen_ids:
+            score -= 0.15
+        score += min(int(challenge_meta.get("response_count", 0) or 0), 4) * 0.02
+        scored.append((score, challenge_meta))
+    if not scored:
+        return None
+    scored.sort(key=lambda item: item[0], reverse=True)
+    selected = scored[0][1]
+    return _serialize_room_challenge(selected, room_info)
 
 
 def _resolve_active_challenge(phone: str, meta: dict, message: str, challenge: dict) -> str | None:
@@ -1981,12 +2236,22 @@ def _resolve_active_challenge(phone: str, meta: dict, message: str, challenge: d
     new_total = meta.get("total_seeds_earned", 0) + seeds_change
     new_seeds = meta.get("seeds", 0) + seeds_change
     completed = int(meta.get("completed_challenges", 0)) + 1
+    completed_ids = list(_completed_challenge_ids(meta))
+    completed_novelty = list(_completed_challenge_novelty_keys(meta))
+    challenge_id = str(challenge.get("id", "") or "")
+    novelty_key = str(challenge.get("novelty_key", challenge_id) or challenge_id)
+    if challenge_id and challenge_id not in completed_ids:
+        completed_ids.append(challenge_id)
+    if novelty_key and novelty_key not in completed_novelty:
+        completed_novelty.append(novelty_key)
     updates = {
         "seeds": new_seeds,
         "total_seeds_earned": new_total,
         "completed_challenges": completed,
         "active_challenge": None,
         "last_completed_challenge_id": challenge.get("id", ""),
+        "completed_challenge_ids": completed_ids[-80:],
+        "completed_challenge_novelty_keys": completed_novelty[-80:],
     }
     if challenge.get("mission_id"):
         mission_progress = meta.get("mission_progress", {}) if isinstance(meta.get("mission_progress", {}), dict) else {}
@@ -2000,6 +2265,18 @@ def _resolve_active_challenge(phone: str, meta: dict, message: str, challenge: d
         updates["mission_progress"] = mission_progress
         updates["completed_missions"] = int(meta.get("completed_missions", 0)) + 1
         world_state.complete_room_mission(room_path, challenge["mission_id"], phone, meta.get("nickname", "Aventureiro"))
+    elif challenge_id:
+        world_state.register_challenge_response(room_path, challenge_id, block)
+        world_state.archive_room_challenge(room_path, challenge_id, reason="completed_by_player")
+
+    world_state.apply_room_consequence(
+        room_path=room_path,
+        consequence_type="mission_completion" if challenge.get("mission_id") else "challenge_completion",
+        summary=f"{meta.get('nickname', 'Aventureiro')} concluiu {challenge.get('title', 'um desafio')}.",
+        intensity=max(1, int(seeds_change or 1)),
+        social_delta=1,
+    )
+    world_state.refresh_room_state(room_path)
 
     _update_meta(phone, updates)
     label = "missão" if challenge.get("mission_id") else f"desafio de {challenge.get('type', 'exploração')}"
