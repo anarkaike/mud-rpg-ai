@@ -1,5 +1,5 @@
 """
-MUD-AI — WhatsApp Message Formatter.
+MUD-AI — WhatsApp Message Formatter v2.1.
 
 Generates consistent, compact, visually rich text messages
 using only WhatsApp-supported formatting (bold, italic, monospace).
@@ -28,6 +28,9 @@ def format_room_view(
     exits: list[dict],
     suggestions: list[dict],
     breadcrumb: str = "",
+    seeds_change: int = 0,
+    badge: str = None,
+    profile_url: str = "",
 ) -> str:
     """
     Standard room view template.
@@ -35,9 +38,12 @@ def format_room_view(
     exits: [{"direction": "norte", "name": "Praça das Trocas"}, ...]
     suggestions: [{"cmd": "olhar", "desc": "ver detalhes"}, ...]
     """
-    stats = f"🪙 {seeds}  ·  ⭐ Nv.{level}"
+    seeds_str = f"🪙 {seeds}"
+    if seeds_change > 0:
+        seeds_str += f" (+{seeds_change})"
+    stats = f"{seeds_str}  ·  ⭐ Nv.{level}"
     if players_here > 0:
-        stats += f"  ·  👥 {players_here} aqui"
+        stats += f"  ·  👥 {players_here}"
 
     exit_lines = "\n".join(f"  ▸ {e['direction']} → {e['name']}" for e in exits)
     suggestion_lines = "\n".join(f"  ▸ _\"{s['cmd']}\"_ — {s['desc']}" for s in suggestions[:3])
@@ -45,11 +51,17 @@ def format_room_view(
     parts = [
         SEP,
         f"🌱 *{room_name.upper()}*",
-        f"_{room_subtitle}_",
+        f"_{room_subtitle}_" if room_subtitle else "",
         SEP,
         stats,
         "",
         f"> {narrative}",
+    ]
+
+    if badge:
+        parts.append(f"\n🏅 _{badge}_")
+
+    parts += [
         "",
         DIV,
         f"📍 *Ir para:*",
@@ -66,8 +78,11 @@ def format_room_view(
     if breadcrumb:
         parts.append(f"\n🗺 {breadcrumb}")
 
+    if profile_url:
+        parts.append(f"🔗 {profile_url}")
+
     parts.append(SEP)
-    return "\n".join(parts)
+    return "\n".join(p for p in parts if p is not None)
 
 
 def format_interaction(
@@ -80,6 +95,7 @@ def format_interaction(
     badge: Optional[str],
     suggestions: list[dict],
     breadcrumb: str = "",
+    profile_url: str = "",
 ) -> str:
     """
     Interaction response template (after player does something).
@@ -102,7 +118,7 @@ def format_interaction(
     ]
 
     if badge:
-        parts.append(f"\n🏷 _{badge}_")
+        parts.append(f"\n🏅 _{badge}_")
 
     if suggestion_lines:
         parts += [
@@ -114,8 +130,11 @@ def format_interaction(
     if breadcrumb:
         parts.append(f"\n🗺 {breadcrumb}")
 
+    if profile_url:
+        parts.append(f"🔗 {profile_url}")
+
     parts.append(SEP)
-    return "\n".join(parts)
+    return "\n".join(p for p in parts if p is not None)
 
 
 def format_onboarding_step(
@@ -124,6 +143,7 @@ def format_onboarding_step(
     title: str,
     question: str,
     hint: str = "",
+    seeds_change: int = 0,
 ) -> str:
     """
     Onboarding step template.
@@ -132,6 +152,12 @@ def format_onboarding_step(
         SEP,
         f"📋 *{title.upper()}* ({step}/{total})",
         SEP,
+    ]
+
+    if seeds_change > 0:
+        parts.append(f"🪙 +{seeds_change} sementes ganhas!")
+
+    parts += [
         "",
         question,
     ]
@@ -154,17 +180,17 @@ def format_profile(
     current_room: str,
     since: str,
     essence: str,
-    traits: str,
+    badges: str,
     seeks: str,
     offers: str,
-    has_house: bool,
-    challenges_done: int,
+    rooms_visited: int,
+    decorations: int,
     suggestions: list[dict],
+    profile_url: str = "",
 ) -> str:
     """
     Player profile view template.
     """
-    house_str = "🏠 _construída_" if has_house else "🏠 _ainda não construída_"
     suggestion_lines = "\n".join(f"  ▸ _\"{s['cmd']}\"_ — {s['desc']}" for s in suggestions[:3])
 
     parts = [
@@ -173,15 +199,22 @@ def format_profile(
         SEP,
         f"🪙 {seeds}  ·  📍 {current_room}  ·  📅 {since}",
         "",
-        f"_{essence}_" if essence else "",
-        "",
-        f"🏷 Traços: {traits}" if traits else "",
-        f"🎯 Busca: {seeks}" if seeks else "",
-        f"🤝 Oferece: {offers}" if offers else "",
-        "",
-        house_str,
-        f"⚔️ Desafios: {challenges_done} concluídos",
     ]
+
+    if essence:
+        parts.append(f"_{essence}_")
+        parts.append("")
+
+    parts += [
+        f"🏅 Badges: {badges}",
+        f"🗺 Salas visitadas: {rooms_visited}",
+        f"📝 Decorações: {decorations}",
+    ]
+
+    if seeks:
+        parts.append(f"🎯 Busca: {seeks}")
+    if offers:
+        parts.append(f"🤝 Oferece: {offers}")
 
     if suggestion_lines:
         parts += [
@@ -190,8 +223,10 @@ def format_profile(
             suggestion_lines,
         ]
 
+    if profile_url:
+        parts.append(f"\n🔗 {profile_url}")
+
     parts.append(SEP)
-    # Filter out empty strings for cleaner output
     return "\n".join(p for p in parts if p is not None)
 
 
@@ -230,14 +265,14 @@ def format_challenge(
 def format_room_list(
     rooms: list[dict],
     player_room: str,
+    profile_url: str = "",
 ) -> str:
     """
     List of available rooms for exploration.
-    rooms: [{"emoji": "📝", "name": "Cantinho dos Versos", "subtitle": "Poesias e poemas"}, ...]
     """
     room_lines = []
     for r in rooms:
-        marker = " ◀ _você está aqui_" if r.get("path") == player_room else ""
+        marker = " ◀ _aqui_" if r.get("path") == player_room else ""
         room_lines.append(f"  {r.get('emoji', '🚪')} *{r['name']}*{marker}")
         room_lines.append(f"     _{r['subtitle']}_")
 
@@ -249,8 +284,12 @@ def format_room_list(
         "\n".join(room_lines),
         "",
         "💬 _Digite o nome da sala para ir_",
-        SEP,
     ]
+
+    if profile_url:
+        parts.append(f"🔗 {profile_url}")
+
+    parts.append(SEP)
     return "\n".join(parts)
 
 
@@ -261,18 +300,19 @@ def format_welcome() -> str:
     return "\n".join([
         SEP,
         "🌱 *BEM-VINDO AO MUD-AI*",
-        "_Um mundo feito de palavras e conexões_",
+        "_Um mundo de texto, conexões e descobertas_",
         SEP,
         "",
-        "Olá! Você acaba de entrar num mundo",
-        "onde histórias se cruzam e pessoas",
-        "se conectam pela essência.",
+        "Opa! Você acaba de entrar num mundo",
+        "onde pessoas se conectam de verdade",
+        "através de texto e criatividade.",
         "",
-        "Antes de explorar, me conta um",
-        "pouquinho sobre você? São 5 perguntas",
-        "rápidas para criar seu personagem. 🎭",
+        "Você começa com *50 🪙 sementes**",
+        "e pode ganhar mais explorando,",
+        "conversando e interagindo!",
         "",
-        "Vamos lá?",
+        "Mas antes, me conta um pouco sobre",
+        "você? São 5 perguntas rápidas. 🎭",
         "",
         "💬 _Digite qualquer coisa para começar_",
         SEP,
@@ -288,6 +328,6 @@ def format_error(message: str) -> str:
         "",
         message,
         "",
-        "💬 _\"ajuda\"_ — ver comandos",
+        "💬 _\"ajuda\"_ ou _/ajuda_ — ver comandos",
         SEP,
     ])

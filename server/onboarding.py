@@ -1,8 +1,8 @@
 """
-MUD-AI — Onboarding System.
+MUD-AI — Onboarding System v2.1.
 
 5-step conversational flow to capture player essence.
-Each step saves progress so the player can resume later.
+Starts with 50 seeds, awards bonus on completion.
 """
 
 from . import database as db
@@ -10,40 +10,42 @@ from . import message_formatter as fmt
 from .ai_client import chat_completion
 
 
+INITIAL_SEEDS = 50
+
 ONBOARDING_STEPS = [
     {
         "step": 1,
         "title": "CRIANDO SEU PERFIL",
-        "question": "Antes de tudo, *como quer ser chamado* aqui dentro?\n\nPode ser um apelido, um nome inventado, ou algo que represente você.",
-        "hint": "✨ _Exemplos: Luna, Eco, Olho d'Água, seu nome real..._",
+        "question": "Antes de tudo, *como quer ser chamado* aqui dentro?\n\nPode ser um apelido, um nome inventado, ou seu nome real.",
+        "hint": "✨ _Exemplos: Luna, Eco, seu nome..._",
         "field": "nickname",
     },
     {
         "step": 2,
         "title": "SUA ESSÊNCIA",
-        "question": "Legal, *{nickname}*! Agora me conta:\n\n> _\"Se você fosse um som, qual seria?\"_ 🎵\n\nPode ser qualquer coisa: o barulho da chuva, uma risada, um acorde de violão...",
+        "question": "Legal, *{nickname}*! Agora me conta:\n\n> _\"Se você fosse um som, qual seria?\"_ 🎵\n\nPode ser qualquer coisa: chuva, risada, um acorde...",
         "hint": "",
         "field": "essence",
     },
     {
         "step": 3,
         "title": "O QUE VOCÊ BUSCA",
-        "question": "Bonito, *{nickname}*. ✨\n\nAgora: *o que te traz aqui?*\n\nO que gostaria de encontrar nesse mundo? Conversas? Inspiração? Histórias? Conexões? Descanso?",
-        "hint": "💬 _Fale livremente, sem filtro_",
+        "question": "Show, *{nickname}*! ✨\n\n*O que te traz aqui?*\n\nConversas? Inspiração? Histórias? Conexões? Diversão?",
+        "hint": "💬 _Fale livremente_",
         "field": "seeks",
     },
     {
         "step": 4,
         "title": "O QUE VOCÊ OFERECE",
-        "question": "E o contrário: *o que você tem pra compartilhar* com o mundo?\n\nToda pessoa carrega algo valioso. Pode ser escuta, humor, uma habilidade, histórias, conselhos...",
-        "hint": "🤝 _O que te vem à mente primeiro?_",
+        "question": "E o contrário: *o que você tem pra compartilhar?*\n\nEscuta, humor, habilidade, histórias, conselhos...",
+        "hint": "🤝 _O que vem à mente?_",
         "field": "offers",
     },
     {
         "step": 5,
         "title": "PRIMEIRA MARCA",
-        "question": "Última! 🎉\n\n> _Deixe uma frase na parede da Recepção — algo que represente você para quem passar por aqui._\n\nPode ser uma frase sua, uma citação, um sentimento, um desejo...",
-        "hint": "📝 _Essa frase ficará visível para outros visitantes_",
+        "question": "Última! 🎉\n\n> _Deixe uma frase na parede da Recepção — algo que represente você._\n\nPode ser uma frase sua, citação, ou qualquer coisa.",
+        "hint": "📝 _Essa frase fica visível para outros visitantes_",
         "field": "first_fragment",
     },
 ]
@@ -88,10 +90,19 @@ async def process_onboarding(phone: str, message: str) -> str:
 
         # If step 5 (last), finalize onboarding
         if current_step == 5:
+            # Award completion bonus
+            bonus = 3
+            current_seeds = meta.get("seeds", INITIAL_SEEDS)
             updates["state"] = "playing"
             updates["onboarding_step"] = 6  # done
             updates["current_room"] = "mudai.places.start"
+            updates["seeds"] = current_seeds + bonus
+            updates["total_seeds_earned"] = meta.get("total_seeds_earned", 0) + bonus
+            updates["badges"] = meta.get("badges", []) + ["primeiro_passo"]
             _update_meta(phone, updates)
+
+            # Check referral bonus
+            _check_referral_bonus(phone)
 
             # Add fragment to reception
             _add_fragment_to_room(
@@ -141,23 +152,25 @@ async def start_onboarding(phone: str) -> str:
         state = meta.get("state", "")
 
         if state == "onboarding":
-            # Resume onboarding
             return await process_onboarding(phone, "")
 
-        # Player exists and already done onboarding
-        return None  # Caller should handle normally
+        return None
 
     # Create player from template
     db.copy_artifact("mudai.templates.player", player_path)
 
-    # Set initial metadata
+    # Set initial metadata with 50 seeds
     _update_meta(phone, {
         "state": "onboarding",
         "onboarding_step": 0,
         "current_room": "mudai.places.start",
         "rooms_visited": ["mudai.places.start"],
-        "seeds": 10,
+        "seeds": INITIAL_SEEDS,
+        "total_seeds_earned": INITIAL_SEEDS,
         "level": 1,
+        "badges": [],
+        "chat_count": 0,
+        "decorations_count": 0,
         "challenges_completed": 0,
         "has_house": False,
         "opted_in_adult": False,
@@ -204,16 +217,13 @@ def _add_fragment_to_room(room_path: str, fragment: str, author: str):
 
     content = room["content"]
 
-    # Find ## Fragmentos section and append
     fragment_line = f'- _"{fragment}"_ — {author} 🌱'
 
     if "## Fragmentos" in content:
-        # Replace placeholder text
         content = content.replace(
             "_Seja o primeiro a deixar sua marca aqui._",
             fragment_line,
         )
-        # If no placeholder, append after section header
         if fragment_line not in content:
             content = content.replace(
                 "## Fragmentos\n",
@@ -231,20 +241,68 @@ def _add_fragment_to_room(room_path: str, fragment: str, author: str):
     )
 
 
+def _check_referral_bonus(phone: str):
+    """Check if this player was referred, award bonus to both."""
+    clean = _clean_phone(phone)
+    referral_path = f"mudai.referrals.{clean}"
+    referral = db.get_artifact(referral_path)
+
+    if not referral:
+        return
+
+    ref_meta = referral.get("metadata_parsed", {})
+    if ref_meta.get("claimed"):
+        return
+
+    referrer_phone = ref_meta.get("referrer", "")
+    if not referrer_phone:
+        return
+
+    # Award bonus to new player
+    player = db.get_artifact(f"mudai.users.{clean}")
+    if player:
+        p_meta = player.get("metadata_parsed", {})
+        p_meta["seeds"] = p_meta.get("seeds", 0) + 5
+        p_meta["total_seeds_earned"] = p_meta.get("total_seeds_earned", 0) + 5
+        _update_meta(phone, p_meta)
+
+    # Award bonus to referrer
+    referrer_clean = _clean_phone(referrer_phone)
+    referrer = db.get_artifact(f"mudai.users.{referrer_clean}")
+    if referrer:
+        r_meta = referrer.get("metadata_parsed", {})
+        r_meta["seeds"] = r_meta.get("seeds", 0) + 5
+        r_meta["total_seeds_earned"] = r_meta.get("total_seeds_earned", 0) + 5
+        badges = r_meta.get("badges", [])
+        if "conector" not in badges:
+            badges.append("conector")
+            r_meta["badges"] = badges
+        _update_meta(referrer_phone, r_meta)
+
+    # Mark referral as claimed
+    ref_meta["claimed"] = True
+    db.put_artifact(
+        path=referral_path,
+        content=referral["content"],
+        content_type=referral.get("content_type", "text/plain"),
+        metadata=ref_meta,
+        is_template=False,
+    )
+
+
 async def _build_welcome_room_response(phone: str) -> str:
     """Build the first room response after onboarding is complete."""
+    import hashlib
     clean = _clean_phone(phone)
     player = db.get_artifact(f"mudai.users.{clean}")
     meta = player.get("metadata_parsed", {})
     nickname = meta.get("nickname", "Aventureiro")
 
     room = db.get_artifact("mudai.places.start")
-    room_meta = room.get("metadata_parsed", {}) if room else {}
 
     # Count players in room
     players_here = _count_players_in_room("mudai.places.start")
 
-    # Extract room name from content
     room_name = "Recepção"
     if room:
         lines = room["content"].split("\n")
@@ -253,13 +311,16 @@ async def _build_welcome_room_response(phone: str) -> str:
                 room_name = line.replace("#", "").strip()
                 break
 
+    token = hashlib.sha256(f"mudai-{clean}-2026".encode()).hexdigest()[:16]
+    profile_url = f"https://mudai.servinder.com.br/p/{token}"
+
     return fmt.format_room_view(
         room_name=room_name,
-        room_subtitle="Seu perfil foi criado! Explore o mundo.",
-        seeds=meta.get("seeds", 10),
-        level=meta.get("level", 1),
+        room_subtitle="Perfil criado! Explore o mundo. 🌱",
+        seeds=meta.get("seeds", INITIAL_SEEDS),
+        level=1,
         players_here=players_here,
-        narrative=f"Bem-vindo, *{nickname}*! Sua essência já está registrada. O mundo se abre diante de você. 🌱",
+        narrative=f"Bem-vindo, *{nickname}*! Seu perfil está pronto. Você ganhou 🌱 *Primeiro Passo* e {INITIAL_SEEDS + 3} sementes. Bora explorar!",
         exits=[
             {"direction": "norte", "name": "Praça das Trocas"},
             {"direction": "leste", "name": "Rua da Consolação"},
@@ -267,11 +328,14 @@ async def _build_welcome_room_response(phone: str) -> str:
             {"direction": "sul", "name": "Jardim dos Ecos"},
         ],
         suggestions=[
-            {"cmd": "olhar", "desc": "ver detalhes da sala"},
-            {"cmd": "salas", "desc": "explorar salas disponíveis"},
+            {"cmd": "salas", "desc": "explorar salas"},
+            {"cmd": "/sementes", "desc": "ver como ganhar"},
             {"cmd": "perfil", "desc": "ver seu personagem"},
         ],
         breadcrumb="Recepção",
+        seeds_change=3,
+        badge="🌱 Primeiro Passo — completou onboarding!",
+        profile_url=profile_url,
     )
 
 

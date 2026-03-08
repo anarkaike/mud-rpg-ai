@@ -300,7 +300,7 @@ _Aguardando o primeiro verso..._
 *Sala de poesias e poemas*
 """,
             "is_template": False,
-            "metadata": {"tags": ["poesia", "escrita", "arte"], "emoji": "📝", "purpose": "Ler e escrever poesias e poemas", "unlock_level": 1},
+            "metadata": {"tags": ["poesia", "escrita", "arte"], "emoji": "📝", "purpose": "Ler e escrever poesias e poemas", "unlock_level": 1, "system_prompt": "Nesta sala, incentive o jogador a escrever poesias, ler versos, e decorar a sala com poemas. Sugira que use 'decorar' seguido de um verso. Fale sobre ritmo, rima e emoção de forma leve."},
         },
         {
             "path": "mudai.places.fogueira",
@@ -327,7 +327,7 @@ _A fogueira espera a primeira história..._
 *Sala de histórias colaborativas*
 """,
             "is_template": False,
-            "metadata": {"tags": ["escrita", "colaboração", "fantasia"], "emoji": "🔥", "purpose": "Criar histórias colaborativas", "unlock_level": 1},
+            "metadata": {"tags": ["escrita", "colaboração", "fantasia"], "emoji": "🔥", "purpose": "Criar histórias colaborativas", "unlock_level": 1, "system_prompt": "Nesta sala, incentive o jogador a contribuir com trechos de histórias. Cada fragmento pode ser o próximo capítulo. Sugira ideias de enredo e peça que use 'decorar' para adicionar partes à história."},
         },
         {
             "path": "mudai.places.jardim",
@@ -354,7 +354,7 @@ _O jardim aguarda suas reflexões..._
 *Lugar de reflexão e autoconhecimento*
 """,
             "is_template": False,
-            "metadata": {"tags": ["reflexão", "consciência", "meditação"], "emoji": "🌿", "purpose": "Reflexão e autoconhecimento", "unlock_level": 1},
+            "metadata": {"tags": ["reflexão", "consciência", "meditação"], "emoji": "🌿", "purpose": "Reflexão e autoconhecimento", "unlock_level": 1, "system_prompt": "Nesta sala, faça perguntas reflexivas ao jogador. Sugira que compartilhe pensamentos e reflexões. Mantenha um tom calmo e acolhedor, sem ser excessivamente filosófico."},
         },
         {
             "path": "mudai.places.espelho",
@@ -381,7 +381,7 @@ _As águas esperam seus sentimentos..._
 *Espaço de escuta e vulnerabilidade*
 """,
             "is_template": False,
-            "metadata": {"tags": ["sentimento", "acolhimento", "escuta"], "emoji": "💧", "purpose": "Sentimentos e vulnerabilidade", "unlock_level": 1},
+            "metadata": {"tags": ["sentimento", "acolhimento", "escuta"], "emoji": "💧", "purpose": "Sentimentos e vulnerabilidade", "unlock_level": 1, "system_prompt": "Nesta sala, ofereça escuta ativa. Se o jogador compartilhar algo pessoal, valide seus sentimentos de forma gentil. Sugira que deixe um fragmento anônimo se quiser."},
         },
         {
             "path": "mudai.places.trocas",
@@ -409,7 +409,7 @@ _A praça espera sua oferta..._
 *Onde habilidades se encontram*
 """,
             "is_template": False,
-            "metadata": {"tags": ["networking", "troca", "habilidade"], "emoji": "🏛", "purpose": "Trocar habilidades e ideias", "unlock_level": 1},
+            "metadata": {"tags": ["networking", "troca", "habilidade"], "emoji": "🏛", "purpose": "Trocar habilidades e ideias", "unlock_level": 1, "system_prompt": "Nesta sala, ajude o jogador a formular o que sabe e o que quer aprender. Incentive trocas e conexões. Pergunte sobre habilidades e interesses."},
         },
         {
             "path": "mudai.places.empreendedor",
@@ -436,7 +436,7 @@ _A bancada espera sua ideia..._
 *Inspiração e ideias de negócio*
 """,
             "is_template": False,
-            "metadata": {"tags": ["empreendedorismo", "negócios", "inovação"], "emoji": "💡", "purpose": "Inspiração empreendedora e ideias", "unlock_level": 1},
+            "metadata": {"tags": ["empreendedorismo", "negócios", "inovação"], "emoji": "💡", "purpose": "Inspiração empreendedora e ideias", "unlock_level": 1, "system_prompt": "Nesta sala, ajude o jogador com brainstorming de ideias de negócio. Faça perguntas sobre o problema que quer resolver. Dê dicas práticas e objetivas."},
         },
         {
             "path": "mudai.places.verdade",
@@ -463,7 +463,7 @@ _A mesa espera seus segredos..._
 *Jogos de verdade e perguntas por turnos*
 """,
             "is_template": False,
-            "metadata": {"tags": ["jogo", "verdade", "social"], "emoji": "🎲", "purpose": "Jogos de verdade e perguntas", "unlock_level": 1},
+            "metadata": {"tags": ["jogo", "verdade", "social"], "emoji": "🎲", "purpose": "Jogos de verdade e perguntas", "unlock_level": 1, "system_prompt": "Nesta sala, proponha jogos de verdade ou consequência por texto. Faça perguntas divertidas e desafiadoras. Mantenha um tom leve e animado."},
         },
         {
             "path": "mudai.places.dilemas",
@@ -490,7 +490,7 @@ _A arena espera sua perspectiva..._
 *Dilemas morais e debates respeitosos*
 """,
             "is_template": False,
-            "metadata": {"tags": ["debate", "filosofia", "perspectiva"], "emoji": "⚖️", "purpose": "Dilemas morais e debates", "unlock_level": 2},
+            "metadata": {"tags": ["debate", "filosofia", "perspectiva"], "emoji": "⚖️", "purpose": "Dilemas morais e debates", "unlock_level": 2, "system_prompt": "Nesta sala, proponha dilemas morais e perguntas filosóficas. Apresente dois lados do argumento. Peça a opinião do jogador e explore diferentes perspectivas."},
         },
         {
             "path": "mudai.places.atlas",
@@ -517,7 +517,7 @@ _O atlas espera seus lugares..._
 *Compartilhe e descubra lugares incríveis*
 """,
             "is_template": False,
-            "metadata": {"tags": ["viagem", "aventura", "descoberta"], "emoji": "🗺", "purpose": "Lugares mágicos e intrigantes", "unlock_level": 1},
+            "metadata": {"tags": ["viagem", "aventura", "descoberta"], "emoji": "🗺", "purpose": "Lugares mágicos e intrigantes", "unlock_level": 1, "system_prompt": "Nesta sala, ajude o jogador a descrever e compartilhar lugares incríveis que conheceu ou gostaria de conhecer. Peça detalhes sensoriais."},
         },
         {
             "path": "mudai.places.maes",
@@ -543,7 +543,7 @@ _A roda espera sua experiência..._
 *Experiências de maternidade e apoio mútuo*
 """,
             "is_template": False,
-            "metadata": {"tags": ["maternidade", "família", "apoio"], "emoji": "🤱", "purpose": "Experiências de maternidade", "unlock_level": 1},
+            "metadata": {"tags": ["maternidade", "família", "apoio"], "emoji": "🤱", "purpose": "Experiências de maternidade", "unlock_level": 1, "system_prompt": "Nesta sala, ofereça apoio e escuta sobre maternidade. Seja acolhedor e evite julgamentos. Incentive troca de experiências."},
         },
         {
             "path": "mudai.places.biblioteca",
@@ -570,7 +570,7 @@ _A biblioteca espera sua página..._
 *Sala livre — qualquer assunto, qualquer conversa*
 """,
             "is_template": False,
-            "metadata": {"tags": ["livre", "geral", "tudo"], "emoji": "📚", "purpose": "Conversa livre sobre qualquer tema", "unlock_level": 1},
+            "metadata": {"tags": ["livre", "geral", "tudo"], "emoji": "📚", "purpose": "Conversa livre sobre qualquer tema", "unlock_level": 1, "system_prompt": "Nesta sala, converse sobre qualquer assunto que o jogador quiser. Seja versátil e interessado."},
         },
         {
             "path": "mudai.places.expansao",
@@ -597,7 +597,7 @@ _O portal espera sua expansão..._
 *Experiências de expansão de consciência*
 """,
             "is_template": False,
-            "metadata": {"tags": ["consciência", "expansão", "adulto"], "emoji": "🌀", "purpose": "Experiências de consciência expandida", "unlock_level": 2},
+            "metadata": {"tags": ["consciência", "expansão", "adulto"], "emoji": "🌀", "purpose": "Experiências de consciência expandida", "unlock_level": 2, "system_prompt": "Nesta sala, converse sobre experiências de expansão de consciência com respeito e curiosidade. Incentive relatos e reflexões sem julgamento."},
         },
     ]
 
