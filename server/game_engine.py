@@ -2009,6 +2009,13 @@ def _seen_challenge_ids(meta: dict) -> set[str]:
     return {str(item) for item in items if item}
 
 
+def _skipped_challenge_ids(meta: dict) -> set[str]:
+    items = meta.get("skipped_challenge_ids", [])
+    if not isinstance(items, list):
+        return set()
+    return {str(item) for item in items if item}
+
+
 def _challenge_type_label(challenge_type: str) -> str:
     mapping = {
         "reflexão": "reflexão",
@@ -2170,12 +2177,14 @@ def _ensure_room_challenge_pool(room_info: dict, player_meta: dict | None = None
     return world_state.list_room_challenges(room_path, limit=50)
 
 
-def _select_room_challenge_for_player(room_info: dict, meta: dict) -> dict | None:
+def _select_room_challenge_for_player(room_info: dict, meta: dict, excluded_ids: set[str] | None = None) -> dict | None:
     room_path = room_info.get("path", "")
     challenges = world_state.list_room_challenges(room_path, limit=50)
     completed_ids = _completed_challenge_ids(meta)
     completed_novelty = _completed_challenge_novelty_keys(meta)
     seen_ids = _seen_challenge_ids(meta)
+    skipped_ids = _skipped_challenge_ids(meta)
+    excluded = set(excluded_ids or set())
     scored = []
     for challenge in challenges:
         challenge_meta = challenge.get("metadata_parsed", {})
@@ -2183,11 +2192,15 @@ def _select_room_challenge_for_player(room_info: dict, meta: dict) -> dict | Non
         novelty_key = str(challenge_meta.get("novelty_key", challenge_id) or challenge_id)
         if not challenge_id or challenge_meta.get("status") != "active":
             continue
+        if challenge_id in excluded:
+            continue
         if challenge_id in completed_ids or novelty_key in completed_novelty:
             continue
         score = float(challenge_meta.get("relevance_score", 0) or 0)
         if challenge_id in seen_ids:
             score -= 0.15
+        if challenge_id in skipped_ids:
+            score -= 0.45
         score += min(int(challenge_meta.get("response_count", 0) or 0), 4) * 0.02
         scored.append((score, challenge_meta))
     if not scored:
@@ -2203,17 +2216,42 @@ def _resolve_active_challenge(phone: str, meta: dict, message: str, challenge: d
     if not text:
         return None
     if normalized in {"pular", "skip"}:
-        _update_meta(phone, {"active_challenge": None})
         room_info = rooms.get_room_info(challenge.get("room_path", meta.get("current_room", "mudai.places.start")))
+        challenge_id = str(challenge.get("id", "") or "")
+        skipped_ids = list(_skipped_challenge_ids(meta))
+        if challenge_id and challenge_id not in skipped_ids:
+            skipped_ids.append(challenge_id)
+        updates = {
+            "active_challenge": None,
+            "skipped_challenge_ids": skipped_ids[-40:],
+        }
+        next_challenge = None
+        if room_info and not challenge.get("mission_id"):
+            next_challenge = _select_room_challenge_for_player(room_info, {**meta, **updates}, excluded_ids={challenge_id} if challenge_id else None)
+            if next_challenge:
+                next_seen_ids = list(_seen_challenge_ids({**meta, **updates}))
+                next_id = str(next_challenge.get("id", "") or "")
+                if next_id and next_id not in next_seen_ids:
+                    next_seen_ids.append(next_id)
+                updates["active_challenge"] = next_challenge
+                updates["seen_challenge_ids"] = next_seen_ids[-40:]
+        _update_meta(phone, updates)
+        suggestions = _get_room_suggestions(room_info, active_challenge=next_challenge) if room_info else [{"cmd": "olhar", "desc": "ver detalhes"}]
+        narrative = "Tudo bem. Você pode continuar explorando e pegar outro desafio mais tarde."
+        if next_challenge:
+            narrative = (
+                f"Tudo bem. Deixei o desafio anterior de lado. "
+                f"Se quiser, o próximo é *{next_challenge.get('title', 'Desafio')}*: {next_challenge.get('instruction', '')}"
+            )
         return fmt.format_interaction(
             room_name=challenge.get("room_name", room_info["name"] if room_info else "Sala"),
             action_label="Desafio ignorado",
             seeds=meta.get("seeds", 0),
             seeds_change=0,
             level=_calculate_level(meta),
-            narrative="Tudo bem. Você pode continuar explorando e pegar outro desafio mais tarde.",
+            narrative=narrative,
             badge=None,
-            suggestions=_get_room_suggestions(room_info) if room_info else [{"cmd": "olhar", "desc": "ver detalhes"}],
+            suggestions=suggestions,
             breadcrumb=(challenge.get("room_name", "Sala")).replace("🌱 ", ""),
             profile_url=_generate_profile_url(phone),
         )
