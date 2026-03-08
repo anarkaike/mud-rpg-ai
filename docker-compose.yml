@@ -6,7 +6,7 @@ services:
     container_name: mudai-server
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "8001:8000"
     volumes:
       - mudai-data:/app/server/data
     environment:
