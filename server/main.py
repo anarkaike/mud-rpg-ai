@@ -22,7 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .database import init_db
 from .auth import BearerAuthMiddleware
-from .routers import artifacts, search, pages
+from .routers import artifacts, search, pages, game
 
 
 app = FastAPI(
@@ -49,6 +49,7 @@ app.add_middleware(BearerAuthMiddleware)
 app.include_router(artifacts.router)
 app.include_router(search.router)
 app.include_router(pages.router)
+app.include_router(game.router)
 
 
 @app.on_event("startup")
@@ -272,6 +273,331 @@ Aqui, o que importa é a sua essência — não a aparência.
 """,
             "is_template": False,
             "metadata": {"type": "system", "description": "Mensagem de boas-vindas"},
+        },
+        # ─── Themed Rooms ─────────────────────────────────────
+        {
+            "path": "mudai.places.versos",
+            "content": """---
+type: place
+theme: criatividade
+---
+# 📝 Cantinho dos Versos
+
+> Um espaço silencioso com paredes cobertas de palavras. Folhas soltas flutuam no ar, cada uma carregando um verso diferente.
+
+## Atmosfera
+O som suave de uma caneta deslizando sobre papel preenche o ambiente. Aqui, cada palavra tem peso e beleza.
+
+## Saídas
+- **sul** → Recepção
+- **leste** → Fogueira dos Contos
+
+## Fragmentos
+_Aguardando o primeiro verso..._
+
+---
+
+*Sala de poesias e poemas*
+""",
+            "is_template": False,
+            "metadata": {"tags": ["poesia", "escrita", "arte"], "emoji": "📝", "purpose": "Ler e escrever poesias e poemas", "unlock_level": 1},
+        },
+        {
+            "path": "mudai.places.fogueira",
+            "content": """---
+type: place
+theme: colaboração
+---
+# 🔥 Fogueira dos Contos
+
+> Uma fogueira crepita no centro de um círculo de pedras. As sombras dançam nas paredes, projetando histórias que mudam de forma.
+
+## Atmosfera
+Calor suave e cheiro de lenha. Cada pessoa que senta ao redor adiciona um capítulo à história que nunca termina.
+
+## Saídas
+- **oeste** → Cantinho dos Versos
+- **sul** → Recepção
+
+## Fragmentos
+_A fogueira espera a primeira história..._
+
+---
+
+*Sala de histórias colaborativas*
+""",
+            "is_template": False,
+            "metadata": {"tags": ["escrita", "colaboração", "fantasia"], "emoji": "🔥", "purpose": "Criar histórias colaborativas", "unlock_level": 1},
+        },
+        {
+            "path": "mudai.places.jardim",
+            "content": """---
+type: place
+theme: reflexão
+---
+# 🌿 Jardim dos Ecos
+
+> Um jardim onde as plantas sussurram. Cada flor guarda uma reflexão de alguém que passou. A fonte no centro reflete não o rosto, mas a essência.
+
+## Atmosfera
+Paz profunda. O vento carrega fragments de pensamentos. Aqui, o silêncio fala mais alto.
+
+## Saídas
+- **norte** → Recepção
+- **leste** → Espelho d\'Água
+
+## Fragmentos
+_O jardim aguarda suas reflexões..._
+
+---
+
+*Lugar de reflexão e autoconhecimento*
+""",
+            "is_template": False,
+            "metadata": {"tags": ["reflexão", "consciência", "meditação"], "emoji": "🌿", "purpose": "Reflexão e autoconhecimento", "unlock_level": 1},
+        },
+        {
+            "path": "mudai.places.espelho",
+            "content": """---
+type: place
+theme: vulnerabilidade
+---
+# 💧 Espelho d'Água
+
+> Uma piscina de água cristalina num ambiente protegido. A superfície reflete emoções, não imagens. As paredes absorvem segredos e guardam gentilmente.
+
+## Atmosfera
+Uma calma profunda. O som da água gotejando é o único ruído. Aqui é seguro sentir.
+
+## Saídas
+- **oeste** → Jardim dos Ecos
+- **norte** → Praça das Trocas
+
+## Fragmentos
+_As águas esperam seus sentimentos..._
+
+---
+
+*Espaço de escuta e vulnerabilidade*
+""",
+            "is_template": False,
+            "metadata": {"tags": ["sentimento", "acolhimento", "escuta"], "emoji": "💧", "purpose": "Sentimentos e vulnerabilidade", "unlock_level": 1},
+        },
+        {
+            "path": "mudai.places.trocas",
+            "content": """---
+type: place
+theme: network
+---
+# 🏛 Praça das Trocas
+
+> Uma praça aberta e movimentada. Bancas coloridas exibem habilidades, ideias e talentos. Pessoas conversam animadamente, trocando o que sabem pelo que querem aprender.
+
+## Atmosfera
+Energia vibrante. Vozes se cruzam em conversas empolgadas. O ar cheira a possibilidade.
+
+## Saídas
+- **sul** → Recepção
+- **leste** → Bancada do Empreendedor
+- **oeste** → Espelho d\'Água
+
+## Fragmentos
+_A praça espera sua oferta..._
+
+---
+
+*Onde habilidades se encontram*
+""",
+            "is_template": False,
+            "metadata": {"tags": ["networking", "troca", "habilidade"], "emoji": "🏛", "purpose": "Trocar habilidades e ideias", "unlock_level": 1},
+        },
+        {
+            "path": "mudai.places.empreendedor",
+            "content": """---
+type: place
+theme: inovação
+---
+# 💡 Bancada do Empreendedor
+
+> Uma oficina iluminada por lâmpadas de Edison. Quadros brancos cobrem as paredes, cheios de ideias, setas e sonhos mapeados. Protótipos de papel se espalham pelas mesas.
+
+## Atmosfera
+Criatividade elétrica. O som de ideias nascendo. Cada conversa pode virar um projeto.
+
+## Saídas
+- **oeste** → Praça das Trocas
+- **sul** → Recepção
+
+## Fragmentos
+_A bancada espera sua ideia..._
+
+---
+
+*Inspiração e ideias de negócio*
+""",
+            "is_template": False,
+            "metadata": {"tags": ["empreendedorismo", "negócios", "inovação"], "emoji": "💡", "purpose": "Inspiração empreendedora e ideias", "unlock_level": 1},
+        },
+        {
+            "path": "mudai.places.verdade",
+            "content": """---
+type: place
+theme: jogo
+---
+# 🎲 Mesa da Verdade
+
+> Uma mesa redonda de madeira escura num salão misterioso. Velas iluminam os rostos dos jogadores. No centro, um dado antigo espera ser lançado.
+
+## Atmosfera
+Tensão divertida. Risos nervosos. Cada rodada revela algo novo sobre quem joga.
+
+## Saídas
+- **oeste** → Recepção
+- **norte** → Arena de Dilemas
+
+## Fragmentos
+_A mesa espera seus segredos..._
+
+---
+
+*Jogos de verdade e perguntas por turnos*
+""",
+            "is_template": False,
+            "metadata": {"tags": ["jogo", "verdade", "social"], "emoji": "🎲", "purpose": "Jogos de verdade e perguntas", "unlock_level": 1},
+        },
+        {
+            "path": "mudai.places.dilemas",
+            "content": """---
+type: place
+theme: debate
+---
+# ⚖️ Arena de Dilemas
+
+> Um anfiteatro circular onde as palavras ecoam. Dois púlpitos se enfrentam. O chão é um mosaico de perspectivas diferentes que, juntas, formam algo belo.
+
+## Atmosfera
+Respeito e curiosidade. Cada opinião é ouvida. Aqui não se vence — se expande.
+
+## Saídas
+- **sul** → Mesa da Verdade
+- **oeste** → Praça das Trocas
+
+## Fragmentos
+_A arena espera sua perspectiva..._
+
+---
+
+*Dilemas morais e debates respeitosos*
+""",
+            "is_template": False,
+            "metadata": {"tags": ["debate", "filosofia", "perspectiva"], "emoji": "⚖️", "purpose": "Dilemas morais e debates", "unlock_level": 2},
+        },
+        {
+            "path": "mudai.places.atlas",
+            "content": """---
+type: place
+theme: descoberta
+---
+# 🗺 Atlas dos Lugares Mágicos
+
+> Uma sala repleta de mapas antigos, globos giratórios e fotografias textuais de lugares que parecem impossíveis. Cada parede é uma janela para outro canto do mundo.
+
+## Atmosfera
+Wanderlust. O cheiro de terra molhada se mistura com ar de montanha. Cada descrição te transporta.
+
+## Saídas
+- **sul** → Recepção
+- **leste** → Fogueira dos Contos
+
+## Fragmentos
+_O atlas espera seus lugares..._
+
+---
+
+*Compartilhe e descubra lugares incríveis*
+""",
+            "is_template": False,
+            "metadata": {"tags": ["viagem", "aventura", "descoberta"], "emoji": "🗺", "purpose": "Lugares mágicos e intrigantes", "unlock_level": 1},
+        },
+        {
+            "path": "mudai.places.maes",
+            "content": """---
+type: place
+theme: apoio
+---
+# 🤱 Roda das Mães
+
+> Um círculo aconchegante com almofadas macias e chá sempre quente. Brinquedos coloridos ocupam um canto, e as paredes são cobertas de desenhos feitos por pequenas mãos.
+
+## Atmosfera
+Acolhimento puro. O som de risadas infantis ao fundo. Sem julgamento, só apoio.
+
+## Saídas
+- **oeste** → Recepção
+
+## Fragmentos
+_A roda espera sua experiência..._
+
+---
+
+*Experiências de maternidade e apoio mútuo*
+""",
+            "is_template": False,
+            "metadata": {"tags": ["maternidade", "família", "apoio"], "emoji": "🤱", "purpose": "Experiências de maternidade", "unlock_level": 1},
+        },
+        {
+            "path": "mudai.places.biblioteca",
+            "content": """---
+type: place
+theme: livre
+---
+# 📚 Biblioteca do Infinito
+
+> Estantes que se estendem até onde a vista alcança. Mas os livros aqui são escritos por quem entra. Cada conversa vira uma página.
+
+## Atmosfera
+Silêncio confortável. O cheiro de páginas antigas. Aqui, qualquer assunto é bem-vindo.
+
+## Saídas
+- **norte** → Recepção
+- **leste** → Cantinho dos Versos
+
+## Fragmentos
+_A biblioteca espera sua página..._
+
+---
+
+*Sala livre — qualquer assunto, qualquer conversa*
+""",
+            "is_template": False,
+            "metadata": {"tags": ["livre", "geral", "tudo"], "emoji": "📚", "purpose": "Conversa livre sobre qualquer tema", "unlock_level": 1},
+        },
+        {
+            "path": "mudai.places.expansao",
+            "content": """---
+type: place
+theme: consciência
+---
+# 🌀 Portal da Expansão
+
+> Uma câmara circular cujas paredes pulsam com padrões fractais. A iluminação é suave e cíclica. O espaço parece maior por dentro do que por fora.
+
+## Atmosfera
+Percepção alterada. O tempo se dilata. As fronteiras entre o interno e o externo se dissolvem.
+
+## Saídas
+- **norte** → Jardim dos Ecos
+- **oeste** → Espelho d\'Água
+
+## Fragmentos
+_O portal espera sua expansão..._
+
+---
+
+*Experiências de expansão de consciência*
+""",
+            "is_template": False,
+            "metadata": {"tags": ["consciência", "expansão", "adulto"], "emoji": "🌀", "purpose": "Experiências de consciência expandida", "unlock_level": 2},
         },
     ]
 
