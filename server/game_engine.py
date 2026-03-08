@@ -629,12 +629,13 @@ async def _handle_look(phone: str, meta: dict) -> str:
         return fmt.format_error("Você parece estar... em lugar nenhum. Diga \"salas\" para explorar.")
 
     nickname = meta.get("nickname", "Aventureiro")
+    active_challenge = _ensure_active_challenge(phone, meta, room_info, trigger="look")
     narrative = await _generate_narrative(
         room_name=room_info["name"],
         player_name=nickname,
         action="olha ao redor com atenção",
     )
-    room_dynamic = _build_room_dynamic_suffix(room_info)
+    room_dynamic = _build_room_dynamic_suffix(room_info, active_challenge=active_challenge)
     if room_dynamic:
         narrative = f"{narrative} {room_dynamic}".strip()
 
@@ -646,11 +647,11 @@ async def _handle_look(phone: str, meta: dict) -> str:
         players_here=room_info["players_here"],
         narrative=narrative,
         exits=room_info["exits"],
-        suggestions=_get_room_suggestions(room_info),
+        suggestions=_get_room_suggestions(room_info, active_challenge=active_challenge),
         breadcrumb=room_info["name"].replace("🌱 ", "").replace("📝 ", ""),
         profile_url=_generate_profile_url(phone),
     )
-    return await _attach_room_challenge(phone, meta, room_info, response, trigger="look")
+    return await _attach_room_challenge(phone, meta, room_info, response, trigger="look", challenge=active_challenge)
 
 
 def _handle_profile(phone: str, meta: dict) -> str:
@@ -1838,10 +1839,10 @@ def _generate_profile_url(phone: str) -> str:
     return f"{base_url}/p/{token}"
 
 
-async def _attach_room_challenge(phone: str, meta: dict, room_info: dict | None, response: str, trigger: str) -> str:
+async def _attach_room_challenge(phone: str, meta: dict, room_info: dict | None, response: str, trigger: str, challenge: dict | None = None) -> str:
     if not room_info:
         return response
-    challenge = await _ensure_active_challenge(phone, meta, room_info, trigger=trigger)
+    challenge = challenge or _ensure_active_challenge(phone, meta, room_info, trigger=trigger)
     if not challenge:
         return response
     challenge_text = fmt.format_challenge(
@@ -2306,14 +2307,24 @@ def _extract_short_subtitle(content: str) -> str:
     return sub[:50] + "..." if len(sub) > 50 else sub
 
 
-def _get_room_suggestions(room_info: dict) -> list[dict]:
+def _get_room_suggestions(room_info: dict, active_challenge: dict | None = None) -> list[dict]:
     """Get contextual suggestions based on room state."""
     suggestions = [
         {"cmd": "olhar", "desc": "ver detalhes"},
     ]
 
+    if active_challenge:
+        suggestions.append({"cmd": "responder desafio", "desc": active_challenge.get("title", "encarar desafio ativo")})
+        suggestions.append({"cmd": "pular", "desc": "ignorar o desafio atual"})
+    else:
+        challenges = room_info.get("challenges", []) if room_info else []
+        if challenges:
+            first_challenge = challenges[0]
+            suggestions.append({"cmd": "responder desafio", "desc": first_challenge.get("title", "encarar desafio ativo")})
+            suggestions.append({"cmd": "pular", "desc": "ignorar o desafio atual"})
+
     missions = room_info.get("missions", []) if room_info else []
-    if missions:
+    if missions and not active_challenge:
         first_mission = missions[0]
         suggestions.append({"cmd": "responder missão", "desc": first_mission.get("title", "avançar missão")})
 
@@ -2340,10 +2351,18 @@ def _get_room_suggestions(room_info: dict) -> list[dict]:
         suggestions.append({"cmd": "olhar", "desc": "ver a sala evoluindo"})
 
     suggestions.append({"cmd": "salas", "desc": "explorar mais"})
-    return suggestions[:3]
+    deduped = []
+    seen = set()
+    for suggestion in suggestions:
+        key = (suggestion.get("cmd", ""), suggestion.get("desc", ""))
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(suggestion)
+    return deduped[:4]
 
 
-def _build_room_dynamic_suffix(room_info: dict | None) -> str:
+def _build_room_dynamic_suffix(room_info: dict | None, active_challenge: dict | None = None) -> str:
     if not room_info:
         return ""
     motifs = room_info.get("motifs", [])[:3]
@@ -2367,6 +2386,13 @@ def _build_room_dynamic_suffix(room_info: dict | None) -> str:
     image = room_info.get("image")
     if image and image.get("status") == "pending_generation":
         parts.append("A sala está juntando detalhes para ganhar uma nova imagem.")
+    challenge = active_challenge or ((room_info.get("challenges", []) or [None])[0])
+    if challenge:
+        title = str(challenge.get("title", "Desafio") or "Desafio").strip()
+        instruction = str(challenge.get("instruction", "") or "").strip()
+        reward = int(challenge.get("reward_seeds", SEEDS_REWARDS["challenge"]) or SEEDS_REWARDS["challenge"])
+        if instruction:
+            parts.append(f"Desafio ativo: *{title}* — {instruction} (vale {reward} sementes; responda ou diga _pular_).")
     return " ".join(parts[:2])
 
 
