@@ -207,6 +207,10 @@ async def process_action(phone: str, message: str) -> str:
     if state == "onboarding":
         return await process_onboarding(phone, message)
 
+    pending_response = await _handle_pending_action(phone, meta, message)
+    if pending_response:
+        return pending_response
+
     # 3. Parse player intent
     action = await _parse_action(message)
     action_type = action.get("action", "chat")
@@ -757,6 +761,7 @@ async def _handle_decorate(phone: str, meta: dict, message: str) -> str:
     fragment = _extract_decoration_fragment(message)
 
     if needs_room_clarification:
+        _update_meta(phone, {"pending_action": {"type": "decorate", "fragment": fragment}})
         room_info = rooms.get_room_info(meta.get("current_room", "mudai.places.start"))
         return fmt.format_interaction(
             room_name=room_info["name"] if room_info else "Sala",
@@ -799,6 +804,7 @@ async def _handle_decorate(phone: str, meta: dict, message: str) -> str:
         content=fragment,
         block_type="decoration",
     )
+    _update_meta(phone, {"pending_action": None})
     room_state = world_state.get_room_state(current_room)
     state_meta = room_state.get("metadata_parsed", {}) if room_state else {}
     if state_meta.get("image_refresh_needed"):
@@ -1101,6 +1107,42 @@ def _extract_decoration_fragment(message: str) -> str:
 
     fragment = fragment.strip(" .!\n\t")
     return fragment
+
+
+async def _handle_pending_action(phone: str, meta: dict, message: str) -> str | None:
+    pending = meta.get("pending_action")
+    if not isinstance(pending, dict):
+        return None
+
+    pending_type = pending.get("type")
+    text = (message or "").strip()
+    if not text:
+        return None
+
+    if text.lower() in {"cancelar", "cancela", "deixa", "deixa pra la", "deixa pra lá"}:
+        _update_meta(phone, {"pending_action": None})
+        room_info = rooms.get_room_info(meta.get("current_room", "mudai.places.start"))
+        return fmt.format_interaction(
+            room_name=room_info["name"] if room_info else "Sala",
+            action_label="Ação cancelada",
+            seeds=meta.get("seeds", 0),
+            seeds_change=0,
+            level=_calculate_level(meta),
+            narrative="Tudo bem. Cancelei essa ação pendente.",
+            badge=None,
+            suggestions=_get_room_suggestions(room_info) if room_info else [{"cmd": "olhar", "desc": "ver detalhes"}],
+            profile_url=_generate_profile_url(phone),
+        )
+
+    if pending_type == "decorate":
+        fragment = str(pending.get("fragment", "") or "").strip()
+        if not fragment:
+            _update_meta(phone, {"pending_action": None})
+            return None
+        combined_message = f"decorar {fragment} {text}".strip()
+        return await _handle_decorate(phone, {**meta, "pending_action": None}, combined_message)
+
+    return None
 
 
 def _handle_referral(phone: str, target_phone: str) -> str:
