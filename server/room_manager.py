@@ -141,6 +141,11 @@ def find_social_matches(phone: str, limit: int = 5) -> list[dict]:
     seeks_terms = _tokenize_match_text(meta.get("seeks", ""))
     offers_terms = _tokenize_match_text(meta.get("offers", ""))
     current_room = meta.get("current_room", "")
+    persisted_by_phone = {
+        artifact["metadata_parsed"].get("other_phone"): artifact.get("metadata_parsed", {})
+        for artifact in db.list_by_prefix(_social_matches_prefix(clean), direct_children_only=True)
+        if artifact.get("metadata_parsed", {}).get("other_phone")
+    }
 
     candidates = []
     for other in db.list_by_prefix("mudai.users.", direct_children_only=True):
@@ -163,6 +168,8 @@ def find_social_matches(phone: str, limit: int = 5) -> list[dict]:
         if score <= 0:
             continue
 
+        persisted = persisted_by_phone.get(other["path"].split(".")[-1], {})
+
         candidates.append({
             "phone": other["path"].split(".")[-1],
             "nickname": other_meta.get("nickname", "Viajante"),
@@ -171,10 +178,58 @@ def find_social_matches(phone: str, limit: int = 5) -> list[dict]:
             "offer_matches": offer_matches,
             "score": score,
             "same_room": other_meta.get("current_room") == current_room and bool(current_room),
+            "seen_count": int(persisted.get("seen_count", 0) or 0),
+            "last_seen_at": persisted.get("last_seen_at", ""),
+            "is_new": not bool(persisted),
         })
 
     candidates.sort(key=lambda item: (-item["score"], item["nickname"].lower()))
     return candidates[:limit]
+
+
+def persist_social_matches(phone: str, matches: list[dict]) -> list[dict]:
+    clean = _clean_phone(phone)
+    player = db.get_artifact(f"mudai.users.{clean}")
+    if not player:
+        return []
+
+    persisted_matches = []
+    for match in matches:
+        other_phone = match.get("phone")
+        if not other_phone:
+            continue
+        path = _social_match_path(clean, other_phone)
+        existing = db.get_artifact(path)
+        existing_meta = existing.get("metadata_parsed", {}) if existing else {}
+        seen_count = int(existing_meta.get("seen_count", 0) or 0) + 1
+        metadata = {
+            "owner_phone": clean,
+            "other_phone": other_phone,
+            "nickname": match.get("nickname", "Viajante"),
+            "score": match.get("score", 0),
+            "same_room": match.get("same_room", False),
+            "current_room": match.get("current_room", ""),
+            "seek_matches": match.get("seek_matches", []),
+            "offer_matches": match.get("offer_matches", []),
+            "seen_count": seen_count,
+            "first_seen_at": existing_meta.get("first_seen_at") or db._now(),
+            "last_seen_at": db._now(),
+        }
+        artifact = db.put_artifact(
+            path=path,
+            content=f"Match entre {clean} e {other_phone}",
+            content_type="text/plain",
+            metadata=metadata,
+            is_template=False,
+        )
+        persisted_matches.append({
+            **match,
+            "seen_count": artifact.get("metadata_parsed", {}).get("seen_count", seen_count),
+            "last_seen_at": artifact.get("metadata_parsed", {}).get("last_seen_at", ""),
+            "is_new": seen_count == 1,
+        })
+
+    return persisted_matches
 
 
 def find_room_by_name(name: str) -> Optional[str]:
@@ -392,6 +447,14 @@ def _extract_fragments(content: str) -> list[str]:
 
 def _clean_phone(phone: str) -> str:
     return "".join(c for c in phone if c.isalnum())
+
+
+def _social_matches_prefix(clean_phone: str) -> str:
+    return f"mudai.users.{clean_phone}.social_matches."
+
+
+def _social_match_path(clean_phone: str, other_phone: str) -> str:
+    return f"{_social_matches_prefix(clean_phone)}{other_phone}"
 
 
 def _tokenize_match_text(text: str) -> set[str]:

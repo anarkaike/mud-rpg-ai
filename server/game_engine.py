@@ -420,6 +420,7 @@ def _handle_profile(phone: str, meta: dict) -> str:
 
 def _handle_social_matches(phone: str, meta: dict) -> str:
     matches = rooms.find_social_matches(phone, limit=5)
+    matches = rooms.persist_social_matches(phone, matches)
     return fmt.format_social_matches(matches, profile_url=_generate_profile_url(phone))
 
 

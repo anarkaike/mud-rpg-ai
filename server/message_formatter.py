@@ -235,7 +235,13 @@ def format_social_matches(matches: list[dict], profile_url: str = "") -> str:
         room = match.get("current_room", "")
         room_label = room.split(".")[-1].replace("_", " ").title() if room else "Em trânsito"
         room_hint = " · mesma sala" if match.get("same_room") else f" · {room_label}"
-        lines.append(f"  ▸ *{match.get('nickname', 'Viajante')}*{room_hint}")
+        if match.get("is_new"):
+            state_hint = " · nova"
+        elif match.get("seen_count", 0):
+            state_hint = f" · vista {match.get('seen_count')}x"
+        else:
+            state_hint = ""
+        lines.append(f"  ▸ *{match.get('nickname', 'Viajante')}*{room_hint}{state_hint}")
         seek_matches = match.get("seek_matches", [])[:2]
         offer_matches = match.get("offer_matches", [])[:2]
         if seek_matches:
