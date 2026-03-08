@@ -19,9 +19,10 @@ Sobre os artifacts base, o projeto agora mantém uma camada derivada para aproxi
 
 ### 1.2. Estado Vivo das Salas (`server/world_state.py`)
 Cada sala pode acumular estado persistente próprio fora do markdown original.
-* **Artifacts de estado:** o backend cria e atualiza `mudai.world.rooms.{slug}.state`, além de blocos, imagens e missões relacionados.
+* **Artifacts de estado:** o backend cria e atualiza `mudai.world.rooms.{slug}.state`, além de blocos, imagens, missões e desafios relacionados.
 * **Resumo evolutivo:** contribuições dos jogadores alimentam `evolving_summary`, `visual_summary`, `motifs`, destaques recentes e a necessidade de renovar imagens da sala.
 * **Missões locais:** salas podem gerar missões persistentes baseadas no propósito e nos motivos recentes, oferecendo desafios leves sem depender de frontend.
+* **Desafios dinâmicos persistentes:** cada sala pode manter um pool próprio de desafios em `mudai.world.rooms.{slug}.challenges.*`, com `novelty_key`, `relevance_score`, contagem de respostas e últimas 5 respostas anônimas.
 * **Logs persistentes:** eventos relevantes entram em `game_log`, permitindo refletir no estado vivo da sala e em leituras futuras.
 * **Consequências persistentes:** o estado também acumula `momentum_score`, `social_heat`, `challenge_completion_count`, `last_consequence_type` e `last_consequence_summary`, reagindo a novos blocos, conclusões de missão e marcos sociais disparados no engine.
 * **Flavor contextual por sala:** o backend agora classifica ecos recentes como `poetic`, `exchange_offer`, `exchange_request` ou `support`, acumulando contadores como `poetic_echoes`, `exchange_offers`, `exchange_requests` e `support_echoes` para deixar salas de poesia, escrita e troca mais coerentes com o que os jogadores realmente postam.
@@ -35,6 +36,8 @@ Cada sala pode acumular estado persistente próprio fora do markdown original.
 * Avaliar comandos soltos.
 * Lidar com interações nas salas, onde o jogador quer colocar uma frase, pegar um item, deixar um conselho, etc (avaliado dinamicamente via IA).
 * Oferecer e resolver desafios contextuais por sala, usando o estado vivo da sala para gerar pequenas missões conversacionais com recompensa.
+* Selecionar desafios dinâmicos persistentes por jogador, evitando repetição por `completed_challenge_ids` e `completed_challenge_novelty_keys`.
+* Rotacionar desafios quando o jogador ignora um desafio dinâmico elegível, tentando oferecer outra opção da mesma sala.
 * Persistir missões derivadas por sala como artifacts do mundo vivo, permitindo progresso por jogador e reuso da mesma missão ao longo do tempo.
 * Materializar novas salas dinamicamente quando uma saída conhecida aponta para um destino ainda não persistido, preservando o fluxo de exploração sem depender de seed manual prévia no banco.
 
@@ -56,7 +59,14 @@ Componente UI central para a interface via **WhatsApp**. A UI do WhatsApp só ac
 ### 6. Public Profiles e Renderer HTML (`server/routers/pages.py` & `server/renderer.py`)
 Como links para páginas extensas ajudam na visualização dos usuários (nem tudo cabe no WhatsApp), temos endpoints públicos (`/p/{token} `). 
 Eles mapeiam um artefato Markdown em HTML nativamente, usando `markdown2` e estilos de **Dark Mode / Glassmorphism** puros via CSS injetado e substituição dinâmica via expressões regulares para os campos do Profile `{nickname}`.
-Quando a navegação ocorre com sessão web ativa, o renderer também projeta o estado vivo da sala em componentes visuais próprios, incluindo painel de missões persistentes, status da missão ativa, progresso já concluído pelo jogador e sincronização parcial via HTMX para manter barras laterais e terminal coerentes após cada ação.
+Quando a navegação ocorre com sessão web ativa, o renderer também projeta o estado vivo da sala em componentes visuais próprios, incluindo painel de missões persistentes, status da missão ativa, progresso já concluído pelo jogador, desafios dinâmicos da sala e as últimas respostas anônimas agregadas por desafio.
+
+### 6.1. Hardening de Privacidade (`server/routers/pages.py` & `server/routers/game.py`)
+As superfícies web e API foram endurecidas para reduzir exposição de identificadores sensíveis.
+* **Sem listagem pública de jogadores:** a navegação pública foi restringida para salas e acessos autenticados por token.
+* **Sem acesso público direto a `mudai.users.*`:** caminhos de usuário deixaram de ser navegáveis publicamente.
+* **Estado sanitizado do jogador:** `/api/v1/game/state/{phone}` não retorna o telefone bruto nem o artifact completo do player.
+* **Resolução robusta de jogador:** o endpoint protegido aceita identificador bruto, sanitizado ou path completo do artifact e resolve o jogador correto no banco ativo.
 
 ### 7. Expansão Dinâmica do Mundo (`server/room_manager.py`)
 O backend consegue transformar saídas textuais em salas reais quando o jogador tenta atravessá-las e o destino ainda não existe como artifact.
@@ -92,3 +102,11 @@ Quando um usuário manda mensagem no WhatsApp:
 7. Ao decorar ou concluir interações relevantes, o engine também atualiza a camada de `world_state` da sala, incluindo resumo vivo, ecos recentes e preparação de imagem.
 8. O endpoint devolve um payload JSON com a resposta formatada para WhatsApp.
 9. O **n8n** responde o Chatwoot.
+
+## 🔎 Nota Operacional de QA e Deploy
+
+Durante QA de endpoints protegidos, é importante validar contra o banco ativo do container publicado, não apenas contra o banco local do workspace.
+
+* **Banco local vs volume ativo:** o app em produção/homolog publicado pelo Coolify usa o volume persistente anexado ao container, que pode divergir do arquivo SQLite local do repositório.
+* **Estratégia recomendada:** para validar `/api/v1/game/state/{phone}`, liste primeiro os usuários pelo próprio app ativo via `/api/v1/artifacts?prefix=mudai.users.&direct=true` com `Authorization`.
+* **Motivo:** isso evita falsos negativos de QA ao testar IDs que existem localmente, mas não no volume do runtime publicado.
