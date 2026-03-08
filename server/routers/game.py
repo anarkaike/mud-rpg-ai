@@ -21,6 +21,39 @@ from ..renderer import render_markdown_to_html
 router = APIRouter(prefix="/api/v1", tags=["game"])
 
 
+def _resolve_player_artifact(player_identifier: str) -> Optional[dict]:
+    raw = (player_identifier or "").strip()
+    if not raw:
+        return None
+    candidates = []
+    if raw.startswith("mudai.users."):
+        candidates.append(raw)
+        suffix = raw.split(".")[-1]
+        if suffix:
+            candidates.append(f"mudai.users.{''.join(c for c in suffix if c.isalnum())}")
+    else:
+        candidates.append(f"mudai.users.{raw}")
+        candidates.append(f"mudai.users.{''.join(c for c in raw if c.isalnum())}")
+    seen = set()
+    for candidate in candidates:
+        normalized = candidate.strip()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        artifact = db.get_artifact(normalized)
+        if artifact:
+            return artifact
+    cleaned = "".join(c for c in raw.split(".")[-1] if c.isalnum())
+    if not cleaned:
+        return None
+    for artifact in db.list_by_prefix("mudai.users.", direct_children_only=True):
+        path = artifact.get("path", "")
+        suffix = path.split(".")[-1] if path else ""
+        if "".join(c for c in suffix if c.isalnum()) == cleaned:
+            return artifact
+    return None
+
+
 def _find_phone_by_token(token: str) -> Optional[str]:
     """Find a player phone by its hashed token."""
     users = db.list_by_prefix("mudai.users.", direct_children_only=True)
@@ -175,16 +208,16 @@ async def get_player_state(phone: str):
     """
     Get the full state of a player (for debugging/web UI).
     """
-    from .. import database as db
     from .. import room_manager as rooms
 
-    clean = "".join(c for c in phone if c.isalnum())
-    player = db.get_artifact(f"mudai.users.{clean}")
+    player = _resolve_player_artifact(phone)
 
     if not player:
         raise HTTPException(status_code=404, detail="Player not found")
 
     meta = player.get("metadata_parsed", {})
+    player_path = player.get("path", "")
+    player_phone = player_path.split(".")[-1] if player_path.startswith("mudai.users.") else phone
     current_room_path = meta.get("current_room", "")
     room_info = rooms.get_room_info(current_room_path) if current_room_path else None
     profile_signals = meta.get("profile_signals", {})
@@ -216,8 +249,8 @@ async def get_player_state(phone: str):
             "current_moment": structured_profile_context.get("current_moment", ""),
             "communication_style": structured_profile_context.get("communication_style", ""),
         },
-        "social_matches": rooms.find_social_matches(phone, limit=8),
-        "social_match_history": rooms.list_social_match_history(phone, limit=8),
+        "social_matches": rooms.find_social_matches(player_phone, limit=8),
+        "social_match_history": rooms.list_social_match_history(player_phone, limit=8),
         "current_room": room_info,
         "current_room_state": world_state.get_room_state(current_room_path) if current_room_path else None,
         "current_room_blocks": world_state.list_room_blocks(current_room_path, limit=8) if current_room_path else [],
@@ -233,7 +266,7 @@ async def get_player_state(phone: str):
                 "subtitle": rooms._extract_subtitle(r.get("content", "")),
                 "relevance": r.get("relevance", 0),
             }
-            for r in rooms.get_rooms_for_player(phone)
+            for r in rooms.get_rooms_for_player(player_phone)
         ],
     }
 
