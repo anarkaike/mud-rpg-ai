@@ -7,7 +7,7 @@ Starts with 50 seeds, awards bonus on completion.
 
 from . import database as db
 from . import message_formatter as fmt
-from .ai_client import chat_completion
+from .ai_client import chat_completion_json
 
 
 INITIAL_SEEDS = 50
@@ -52,27 +52,32 @@ ONBOARDING_STEPS = [
 
 
 AI_ONBOARDING_PROMPT = """Você é CultivIA, a guia do MUD-AI.
-Você está conduzindo o onboarding de um novo jogador. Seu objetivo é fazer as perguntas de forma calorosa, criativa e variada, mantendo o tom casual e direto do jogo.
+Você está conduzindo o onboarding de um novo jogador. Seu objetivo é fazer as perguntas de forma calorosa, criativa e VASTAMENTE variada, mantendo o tom casual e direto do jogo.
 
 DADOS DO PASSO:
 - Passo Atual: {step}/5
 - Objetivo: {title}
 - Pergunta Base: {question_base}
+- Dica/Sugestão Base: {hint_base}
 - Apelido do Jogador: {nickname}
 - Respostas Anteriores: {context}
 
-REGRAS:
-- No máximo 3 frases.
-- Varie a forma de perguntar (use metáforas leves, mude a ordem, seja amigável).
-- Não invente novas perguntas, apenas mude a FORMA de fazer a pergunta do objetivo atual.
-- Mantenha a clareza sobre o que o jogador precisa responder.
-- Use no máximo 1 emoji.
+REGRAS ESTritas:
+- Varie IMENSAMENTE a forma de perguntar (use metáforas, cenários, seja poética ou enigmática).
+- Dê sugestões/exemplos TOTALMENTE NOVOS que fujam da Dica Base.
+- *Nomes*: Sugira nomes inventados, místicos, apelidos divertidos, ou de objetos.
+- *Sons*: Fale sobre cores, texturas, paisagens, elementos da natureza, instrumentos musicais... mude a lógica!
+- *Busca/Tesouros*: Sugira mapas perdidos, desabafos, conexões inusitadas, etc.
+- Responda OBRIGATORIAMENTE em JSON válido com duas chaves:
+  "question": O texto da sua pergunta usando formatação Markdown de WhatsApp (*negrito*, _itálico_). 1-3 frases curtas.
+  "hint": A nova dica/sugestão com seus exemplos malucos. Comece com 1 emoji e _itálico_. Ex: "✨ _Exemplos: Jota, Raio, O Viajante..._"
 
-Gere apenas o texto da pergunta variada."""
+Não gere markdown ````json em volta, apenas o JSON puro, começando com {{. 
+"""
 
 
-async def _generate_ai_question(step: int, title: str, question_base: str, nickname: str, meta: dict) -> str:
-    """Generate a varied onboarding question using AI."""
+async def _generate_ai_question(step: int, title: str, question_base: str, hint_base: str, nickname: str, meta: dict) -> dict:
+    """Generate a vastly varied onboarding question and hint using AI."""
     context = ""
     # Collect answers from previous steps for context
     fields = ["nickname", "essence", "seeks", "offers"]
@@ -84,21 +89,25 @@ async def _generate_ai_question(step: int, title: str, question_base: str, nickn
         step=step,
         title=title,
         question_base=question_base,
+        hint_base=hint_base,
         nickname=nickname or "viajante",
         context=context or "Iniciando agora."
     )
 
     try:
-        varied_question = await chat_completion(
+        varied = await chat_completion_json(
             system_prompt=prompt,
-            user_message=f"Gere a pergunta para o passo {step}",
-            temperature=0.8,
-            max_tokens=150
+            user_message=f"Gere a pergunta para o passo {step} em JSON",
+            temperature=0.9,
+            max_tokens=200
         )
-        return varied_question.strip()
+        return varied
     except Exception as e:
         print(f"⚠️ AI Onboarding variation failed: {e}")
-        return question_base.replace("{nickname}", nickname or "viajante")
+        return {
+            "question": question_base.replace("{nickname}", nickname or "viajante"),
+            "hint": hint_base
+        }
 
 
 async def process_onboarding(phone: str, message: str) -> str:
@@ -166,11 +175,12 @@ async def process_onboarding(phone: str, message: str) -> str:
         next_step_data = ONBOARDING_STEPS[next_step - 1]
         nickname = updates.get("nickname", meta.get("nickname", "viajante"))
 
-        # Generate dynamic AI question
-        question = await _generate_ai_question(
+        # Generate dynamic AI question and hint
+        variation = await _generate_ai_question(
             step=next_step,
             title=next_step_data["title"],
             question_base=next_step_data["question"],
+            hint_base=next_step_data["hint"],
             nickname=nickname,
             meta={**meta, **updates}
         )
@@ -179,8 +189,8 @@ async def process_onboarding(phone: str, message: str) -> str:
             step=next_step,
             total=5,
             title=next_step_data["title"],
-            question=question,
-            hint=next_step_data["hint"],
+            question=variation.get("question", next_step_data["question"]),
+            hint=variation.get("hint", next_step_data["hint"]),
         )
 
     # Already done
@@ -203,7 +213,19 @@ async def start_onboarding(phone: str) -> str:
 
         if state == "onboarding":
             # Already in onboarding, show welcome with first question
-            return fmt.format_welcome()
+            step_data = ONBOARDING_STEPS[0]
+            variation = await _generate_ai_question(
+                step=1,
+                title=step_data["title"],
+                question_base=step_data["question"],
+                hint_base=step_data["hint"],
+                nickname="",
+                meta={},
+            )
+            return fmt.format_welcome(
+                first_question=variation.get("question", ""),
+                first_hint=variation.get("hint", "")
+            )
 
         return None
 
@@ -228,7 +250,19 @@ async def start_onboarding(phone: str) -> str:
         "interests": [],
     })
 
-    return fmt.format_welcome()
+    step_data = ONBOARDING_STEPS[0]
+    variation = await _generate_ai_question(
+        step=1,
+        title=step_data["title"],
+        question_base=step_data["question"],
+        hint_base=step_data["hint"],
+        nickname="",
+        meta={},
+    )
+    return fmt.format_welcome(
+        first_question=variation.get("question", ""),
+        first_hint=variation.get("hint", "")
+    )
 
 
 # ─── Helpers ──────────────────────────────────────────
