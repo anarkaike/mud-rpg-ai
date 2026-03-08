@@ -2071,6 +2071,13 @@ def _skipped_challenge_ids_by_room(meta: dict, room_path: str) -> set[str]:
     return {str(item) for item in items if item}
 
 
+def _effective_skipped_challenge_ids(meta: dict, room_path: str) -> set[str]:
+    scoped_ids = _skipped_challenge_ids_by_room(meta, room_path)
+    if scoped_ids:
+        return scoped_ids
+    return _skipped_challenge_ids(meta)
+
+
 def _with_skipped_challenge_for_room(meta: dict, room_path: str, challenge_id: str) -> dict:
     scoped = meta.get("skipped_challenge_ids_by_room", {})
     scoped = dict(scoped) if isinstance(scoped, dict) else {}
@@ -2080,12 +2087,8 @@ def _with_skipped_challenge_for_room(meta: dict, room_path: str, challenge_id: s
         room_items.append(challenge_id)
     scoped[room_path] = room_items[-20:]
 
-    global_items = list(_skipped_challenge_ids(meta))
-    if challenge_id and challenge_id not in global_items:
-        global_items.append(challenge_id)
-
     return {
-        "skipped_challenge_ids": global_items[-40:],
+        "skipped_challenge_ids": [],
         "skipped_challenge_ids_by_room": scoped,
     }
 
@@ -2280,7 +2283,7 @@ def _select_room_challenge_for_player(room_info: dict, meta: dict, excluded_ids:
     completed_ids = _completed_challenge_ids(meta)
     completed_novelty = _completed_challenge_novelty_keys(meta)
     seen_ids = _seen_challenge_ids(meta)
-    skipped_ids = _skipped_challenge_ids_by_room(meta, room_path) or _skipped_challenge_ids(meta)
+    skipped_ids = _effective_skipped_challenge_ids(meta, room_path)
     cooled_down_ids = _recent_skipped_challenge_ids_by_room(meta, room_path)
     excluded = set(excluded_ids or set())
     scored_primary = []
