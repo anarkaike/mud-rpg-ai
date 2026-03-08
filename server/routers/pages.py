@@ -6,9 +6,9 @@ The AI can generate links like:
     https://mudai.servinder.com.br/p/mudai.users.junio
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
-
+from datetime import datetime, timezone
 from .. import database as db
 from ..renderer import render_markdown_to_html
 from .. import world_state
@@ -93,6 +93,31 @@ Se já recebeu um link com token pelo WhatsApp, é só abrir:
 
 ---
 
+## 🔐 Entrar com telefone + código
+
+Se você já conversa com o MUD-AI pelo WhatsApp, pode entrar na versão Web assim:
+
+1. Peça um código rápido para seu número.
+2. Confira o código recebido no WhatsApp.
+3. Digite telefone + código para entrar.
+
+<form method="post" action="/auth/request-code" style="margin-top: 1.5rem;">
+  <label for="phone-request">Seu telefone (com DDI)</label><br/>
+  <input id="phone-request" name="phone" placeholder="+5511999999999" style="margin-top: 0.25rem; padding: 0.4rem 0.6rem; width: 220px;" />
+  <button type="submit" style="padding: 0.4rem 0.8rem; margin-left: 0.5rem;">Pedir código</button>
+</form>
+
+<form method="post" action="/auth/verify-code" style="margin-top: 1rem;">
+  <label for="phone-verify">Telefone</label><br/>
+  <input id="phone-verify" name="phone" placeholder="+5511999999999" style="margin-top: 0.25rem; padding: 0.4rem 0.6rem; width: 220px;" />
+  <br/>
+  <label for="code" style="margin-top: 0.75rem; display:inline-block;">Código recebido</label><br/>
+  <input id="code" name="code" maxlength="6" style="margin-top: 0.25rem; padding: 0.4rem 0.6rem; width: 120px;" />
+  <button type="submit" style="padding: 0.4rem 0.8rem; margin-left: 0.5rem;">Entrar</button>
+</form>
+
+---
+
 > MUD-AI é um experimento vivo. Cada resposta da IA é uma hipótese, cada jogador é um autor.
 """
     return render_markdown_to_html(content=md, title="MUD-AI — RPG textual", path="landing", full_page=True)
@@ -139,6 +164,67 @@ def _build_player_state(artifact: dict) -> dict:
         "active_challenge": meta.get("active_challenge"),
         "mission_progress": meta.get("mission_progress", {}),
     }
+
+
+@router.post("/auth/request-code", include_in_schema=False)
+async def request_login_code(phone: str = Form(...)):
+    clean = _clean_phone(phone)
+    code = f"{datetime.now(timezone.utc).microsecond % 1000000:06d}"
+    path = f"mudai.login_codes.{clean}"
+    db.put_artifact(
+        path=path,
+        content="login code",
+        metadata={
+            "phone": clean,
+            "code": code,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        },
+    )
+    md = """# Login via WhatsApp
+
+Se o número estiver correto e já estiver jogando pelo WhatsApp,
+você receberá um código por lá.
+
+Depois, volte para a página inicial e informe telefone e código para entrar.
+
+[_Voltar para o início_](/)
+"""
+    html = render_markdown_to_html(content=md, title="Login MUD-AI", path="login-request", full_page=True)
+    return HTMLResponse(content=html)
+
+
+@router.post("/auth/verify-code", include_in_schema=False)
+async def verify_login_code(phone: str = Form(...), code: str = Form(...)):
+    clean = _clean_phone(phone)
+    path = f"mudai.login_codes.{clean}"
+    artifact = db.get_artifact(path)
+    if not artifact:
+        md = """# Código inválido
+
+Não encontrei um código ativo para este número.
+
+Tente pedir um novo código e tentar novamente.
+
+[_Voltar para o início_](/)
+"""
+        html = render_markdown_to_html(content=md, title="Login MUD-AI", path="login-error", full_page=True)
+        return HTMLResponse(content=html, status_code=400)
+    meta = artifact.get("metadata_parsed", {})
+    if meta.get("code") != code.strip():
+        md = """# Código incorreto
+
+O código informado não confere.
+
+Confira a mensagem recebida no WhatsApp e tente novamente.
+
+[_Voltar para o início_](/)
+"""
+        html = render_markdown_to_html(content=md, title="Login MUD-AI", path="login-error", full_page=True)
+        return HTMLResponse(content=html, status_code=400)
+    import hashlib as _hash
+    clean_phone = clean
+    token = _hash.sha256(f"mudai-{clean_phone}-2026".encode()).hexdigest()[:16]
+    return RedirectResponse(url=f"/p/{token}", status_code=303)
 
 
 def _render_artifact_to_html_inner(artifact: dict, path: str, session_token: str | None = None, player_artifact: dict | None = None) -> str:

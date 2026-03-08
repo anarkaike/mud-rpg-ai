@@ -15,6 +15,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 API_TOKEN = os.environ.get("API_TOKEN", "mudai-dev-token-2026")
 
+PUBLIC_PATHS = ("/", "/auth/request-code", "/auth/verify-code")
 PUBLIC_PREFIXES = ("/p/", "/p", "/health", "/docs", "/openapi.json", "/redoc")
 
 
@@ -22,7 +23,7 @@ class BearerAuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
 
-        if path == "/" or any(path.startswith(prefix) for prefix in PUBLIC_PREFIXES):
+        if path in PUBLIC_PATHS or any(path.startswith(prefix) for prefix in PUBLIC_PREFIXES):
             return await call_next(request)
 
         if request.method == "OPTIONS":
