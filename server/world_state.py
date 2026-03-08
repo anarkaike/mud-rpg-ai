@@ -23,6 +23,10 @@ def room_images_prefix(room_path: str) -> str:
     return f"mudai.world.rooms.{room_slug(room_path)}.images."
 
 
+def room_missions_prefix(room_path: str) -> str:
+    return f"mudai.world.rooms.{room_slug(room_path)}.missions."
+
+
 def response_memory_path(scope: str) -> str:
     normalized = re.sub(r"[^a-zA-Z0-9_.-]", "_", scope.strip().lower())
     return f"mudai.world.memory.responses.{normalized}"
@@ -69,6 +73,84 @@ def list_room_images(room_path: str, limit: int = 12) -> list[dict]:
     images = db.list_by_prefix(room_images_prefix(room_path), direct_children_only=True)
     images.sort(key=lambda img: img.get("updated_at", ""), reverse=True)
     return images[:limit]
+
+
+def list_room_missions(room_path: str, limit: int = 6) -> list[dict]:
+    ensure_room_missions(room_path)
+    missions = db.list_by_prefix(room_missions_prefix(room_path), direct_children_only=True)
+    missions.sort(key=lambda mission: mission.get("updated_at", ""), reverse=True)
+    return missions[:limit]
+
+
+def ensure_room_missions(room_path: str, room_name: str = "", purpose: str = "", tags: Optional[list[str]] = None) -> list[dict]:
+    existing = db.list_by_prefix(room_missions_prefix(room_path), direct_children_only=True)
+    if existing:
+        return existing
+
+    state = ensure_room_state(room_path, room_name=room_name, purpose=purpose, tags=tags)
+    state_meta = state.get("metadata_parsed", {})
+    motifs = state_meta.get("motifs", [])[:3]
+    mission_specs = _build_room_mission_specs(
+        room_path=room_path,
+        room_name=room_name or state_meta.get("room_name", room_path),
+        purpose=purpose or state_meta.get("purpose", ""),
+        tags=tags or state_meta.get("tags", []),
+        motifs=motifs,
+    )
+    created = []
+    for spec in mission_specs:
+        mission_id = spec["id"]
+        path = f"{room_missions_prefix(room_path)}{mission_id}"
+        mission = db.put_artifact(
+            path=path,
+            content=spec["instruction"],
+            metadata={
+                "id": mission_id,
+                "room_path": room_path,
+                "room_name": room_name or state_meta.get("room_name", room_path),
+                "title": spec["title"],
+                "instruction": spec["instruction"],
+                "mission_type": spec["mission_type"],
+                "reward_seeds": spec["reward_seeds"],
+                "status": "active",
+                "times_completed": 0,
+                "tags": spec.get("tags", []),
+            },
+        )
+        created.append(mission)
+    return created
+
+
+def get_room_mission(room_path: str, mission_id: str) -> Optional[dict]:
+    if not mission_id:
+        return None
+    return db.get_artifact(f"{room_missions_prefix(room_path)}{mission_id}")
+
+
+def get_player_room_mission(room_path: str, player_meta: dict) -> Optional[dict]:
+    missions = list_room_missions(room_path, limit=6)
+    progress = player_meta.get("mission_progress", {})
+    room_progress = progress.get(room_path, {}) if isinstance(progress, dict) else {}
+    for mission in missions:
+        meta = mission.get("metadata_parsed", {})
+        mission_id = meta.get("id")
+        if not mission_id:
+            continue
+        if room_progress.get(mission_id, {}).get("status") == "completed":
+            continue
+        return mission
+    return missions[0] if missions else None
+
+
+def complete_room_mission(room_path: str, mission_id: str, player_phone: str, player_name: str) -> Optional[dict]:
+    mission = get_room_mission(room_path, mission_id)
+    if not mission:
+        return None
+    meta = mission.get("metadata_parsed", {})
+    meta["times_completed"] = int(meta.get("times_completed", 0)) + 1
+    meta["last_completed_by"] = player_name
+    meta["last_completed_by_hash"] = hashlib.sha256(player_phone.encode()).hexdigest()[:16] if player_phone else ""
+    return db.put_artifact(path=mission["path"], content=mission["content"], metadata=meta)
 
 
 def record_room_block(
@@ -189,18 +271,18 @@ def room_dynamic_snapshot(room_path: str) -> dict:
     state = ensure_room_state(room_path)
     meta = state.get("metadata_parsed", {})
     image = get_random_room_image(room_path)
-    
-    # Get all images for gallery
+
     all_images_artifacts = list_room_images(room_path, limit=12)
     all_images = [img.get("metadata_parsed", {}) for img in all_images_artifacts]
-    
-    # Enrich meta with gallery
-    enriched_meta = {**meta, "all_images": all_images}
-    
+    missions = [mission.get("metadata_parsed", {}) for mission in list_room_missions(room_path, limit=4)]
+
+    enriched_meta = {**meta, "all_images": all_images, "missions": missions}
+
     return {
         "state": enriched_meta,
         "highlight": meta.get("recent_contributions", [])[:3],
         "image": image.get("metadata_parsed", {}) if image else None,
+        "missions": missions,
     }
 
 
@@ -238,6 +320,40 @@ def build_image_prompt(room_path: str, visual_summary: str, evolving_summary: st
     )
 
 
+def _build_room_mission_specs(room_path: str, room_name: str, purpose: str, tags: list[str], motifs: list[str]) -> list[dict]:
+    label = room_name.replace('🌱 ', '').replace('📝 ', '').strip() or room_path.replace('mudai.places.', '')
+    primary = motifs[0] if motifs else purpose or label
+    reward = 4
+    specs = [
+        {
+            "id": hashlib.sha256(f"{room_path}:echoes".encode()).hexdigest()[:12],
+            "title": f"Ecos de {label}",
+            "instruction": f"Deixe uma contribuição curta que fortaleça o clima de {label} em torno de {primary}.",
+            "mission_type": "echo",
+            "reward_seeds": reward,
+            "tags": motifs[:2] or tags[:2],
+        },
+        {
+            "id": hashlib.sha256(f"{room_path}:bridge".encode()).hexdigest()[:12],
+            "title": f"Ponte de {label}",
+            "instruction": f"Escreva uma frase que conecte quem chega agora ao propósito desta sala: {purpose or label}.",
+            "mission_type": "bridge",
+            "reward_seeds": reward,
+            "tags": tags[:2],
+        },
+    ]
+    if any(tag in tags for tag in ["troca", "conexão", "networking"]):
+        specs.append({
+            "id": hashlib.sha256(f"{room_path}:exchange".encode()).hexdigest()[:12],
+            "title": f"Troca Viva em {label}",
+            "instruction": f"Registre uma oferta, pedido ou conexão que faria sentido nascer em {label}.",
+            "mission_type": "exchange",
+            "reward_seeds": reward + 1,
+            "tags": [tag for tag in tags if tag in {"troca", "conexão", "networking"}],
+        })
+    return specs[:3]
+
+
 def _refresh_room_state(room_path: str) -> dict:
     state = ensure_room_state(room_path)
     state_meta = state.get("metadata_parsed", {})
@@ -266,6 +382,9 @@ def _refresh_room_state(room_path: str) -> dict:
     summary = synthesize_room_summary(room_path, blocks, motifs)
     visual_summary = synthesize_visual_summary(room_path, blocks, motifs)
 
+    missions = list_room_missions(room_path, limit=6)
+    mission_meta = [mission.get("metadata_parsed", {}) for mission in missions]
+
     state_meta.update({
         "state_version": int(state_meta.get("state_version", 0)) + 1,
         "block_count": len(blocks),
@@ -277,6 +396,8 @@ def _refresh_room_state(room_path: str) -> dict:
         "evolving_summary": summary,
         "visual_summary": visual_summary,
         "image_pool_size": len(list_room_images(room_path)),
+        "active_missions": mission_meta,
+        "mission_count": len(mission_meta),
         "image_refresh_needed": should_refresh_images(state_meta, blocks, visual_summary),
     })
 

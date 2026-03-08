@@ -192,10 +192,12 @@ async def get_player_state(phone: str):
         "phone": phone,
         "player": player,
         "active_challenge": meta.get("active_challenge"),
+        "mission_progress": meta.get("mission_progress", {}),
         "current_room": room_info,
         "current_room_state": world_state.get_room_state(current_room_path) if current_room_path else None,
         "current_room_blocks": world_state.list_room_blocks(current_room_path, limit=8) if current_room_path else [],
         "current_room_images": world_state.list_room_images(current_room_path, limit=8) if current_room_path else [],
+        "current_room_missions": world_state.list_room_missions(current_room_path, limit=8) if current_room_path else [],
         "available_rooms": [
             {
                 "path": r["path"],
@@ -222,5 +224,6 @@ async def get_room_world_state(room_path: str):
         "state": world_state.get_room_state(room_path) or world_state.ensure_room_state(room_path),
         "blocks": world_state.list_room_blocks(room_path, limit=20),
         "images": world_state.list_room_images(room_path, limit=20),
+        "missions": world_state.list_room_missions(room_path, limit=20),
         "snapshot": world_state.room_dynamic_snapshot(room_path),
     }

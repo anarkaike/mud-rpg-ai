@@ -25,6 +25,7 @@ Sobre os artifacts base, o projeto agora mantém uma camada derivada para aproxi
 * Avaliar comandos soltos.
 * Lidar com interações nas salas, onde o jogador quer colocar uma frase, pegar um item, deixar um conselho, etc (avaliado dinamicamente via IA).
 * Oferecer e resolver desafios contextuais por sala, usando o estado vivo da sala para gerar pequenas missões conversacionais com recompensa.
+* Persistir missões derivadas por sala como artifacts do mundo vivo, permitindo progresso por jogador e reuso da mesma missão ao longo do tempo.
 
 ### 3. AI Client Wrapper (`server/ai_client.py`)
 Cliente agnóstico usando `httpx` para interagir com a API da **OpenAI** e com um fallback inteligente para a **Google Gemini 2.0 Flash**.

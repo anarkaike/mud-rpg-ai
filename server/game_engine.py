@@ -325,7 +325,7 @@ async def _handle_move(phone: str, meta: dict, target: str) -> str:
             "text": f'<span class="log-accent">{nickname}</span> cultivou <span class="player-seeds">+{seeds_change} sementes</span>.',
             "type": "reward"
         }
-        world_state._add_to_game_log(target_room_path, log_entry)
+        world_state._add_to_game_log(target_path, log_entry)
 
     response = fmt.format_room_view(
         room_name=room_info["name"],
@@ -814,6 +814,9 @@ def _attach_room_challenge(phone: str, meta: dict, room_info: dict | None, respo
         instruction=challenge["instruction"],
         reward_seeds=challenge["reward_seeds"],
     )
+    title = challenge.get("title")
+    if title:
+        challenge_text = challenge_text.replace("💬 _Responda para completar_", f"🎯 *{title}*\n\n💬 _Responda para completar_", 1)
     return f"{response}\n\n{challenge_text}"
 
 
@@ -824,7 +827,9 @@ def _ensure_active_challenge(phone: str, meta: dict, room_info: dict, trigger: s
         return active
     if trigger == "move" and active and active.get("status") == "active":
         return None
-    challenge = _build_room_challenge(room_info)
+
+    mission = world_state.get_player_room_mission(current_room, meta)
+    challenge = _build_room_mission_challenge(mission) if mission else _build_room_challenge(room_info)
     if not challenge:
         return None
     _update_meta(phone, {
@@ -871,6 +876,34 @@ def _build_room_challenge(room_info: dict) -> dict | None:
         "instruction": instruction,
         "reward_seeds": SEEDS_REWARDS["challenge"],
         "status": "active",
+        "source": "dynamic_challenge",
+    }
+
+
+def _build_room_mission_challenge(mission: dict | None) -> dict | None:
+    if not mission:
+        return None
+    meta = mission.get("metadata_parsed", {})
+    mission_id = meta.get("id")
+    if not mission_id:
+        return None
+    mission_type = meta.get("mission_type", "missão")
+    challenge_type_map = {
+        "echo": "reflexão",
+        "bridge": "perspectiva",
+        "exchange": "troca",
+    }
+    return {
+        "id": mission_id,
+        "mission_id": mission_id,
+        "room_path": meta.get("room_path", ""),
+        "room_name": meta.get("room_name", "Sala"),
+        "title": meta.get("title", "Missão"),
+        "type": challenge_type_map.get(mission_type, "reflexão"),
+        "instruction": meta.get("instruction", mission.get("content", "")),
+        "reward_seeds": meta.get("reward_seeds", SEEDS_REWARDS["challenge"]),
+        "status": "active",
+        "source": "room_mission",
     }
 
 
@@ -908,28 +941,44 @@ def _resolve_active_challenge(phone: str, meta: dict, message: str, challenge: d
         author_name=meta.get("nickname", "Aventureiro"),
         author_phone=phone,
         content=text,
-        block_type="challenge_response",
+        block_type="mission_response" if challenge.get("mission_id") else "challenge_response",
     )
     seeds_change = challenge.get("reward_seeds", SEEDS_REWARDS["challenge"])
+    new_total = meta.get("total_seeds_earned", 0) + seeds_change
     new_seeds = meta.get("seeds", 0) + seeds_change
     completed = int(meta.get("completed_challenges", 0)) + 1
-    _update_meta(phone, {
+    updates = {
         "seeds": new_seeds,
-        "total_seeds_earned": meta.get("total_seeds_earned", 0) + seeds_change,
+        "total_seeds_earned": new_total,
         "completed_challenges": completed,
         "active_challenge": None,
         "last_completed_challenge_id": challenge.get("id", ""),
-    })
+    }
+    if challenge.get("mission_id"):
+        mission_progress = meta.get("mission_progress", {}) if isinstance(meta.get("mission_progress", {}), dict) else {}
+        room_progress = mission_progress.get(room_path, {}) if isinstance(mission_progress.get(room_path, {}), dict) else {}
+        room_progress[challenge["mission_id"]] = {
+            "status": "completed",
+            "completed_at_block": block.get("metadata_parsed", {}).get("id", ""),
+            "reward_seeds": seeds_change,
+        }
+        mission_progress[room_path] = room_progress
+        updates["mission_progress"] = mission_progress
+        updates["completed_missions"] = int(meta.get("completed_missions", 0)) + 1
+        world_state.complete_room_mission(room_path, challenge["mission_id"], phone, meta.get("nickname", "Aventureiro"))
+
+    _update_meta(phone, updates)
+    label = "missão" if challenge.get("mission_id") else f"desafio de {challenge.get('type', 'exploração')}"
     narrative = (
-        f"Você concluiu o desafio de {challenge.get('type', 'exploração')} e deixou um novo eco na sala. "
+        f"Você concluiu a {label} e deixou um novo eco na sala. "
         f"Impacto narrativo: {block.get('metadata_parsed', {}).get('impact_score', 1)}."
     )
     return fmt.format_interaction(
         room_name=challenge.get("room_name", room_info["name"] if room_info else "Sala"),
-        action_label="Desafio concluído",
+        action_label="Missão concluída" if challenge.get("mission_id") else "Desafio concluído",
         seeds=new_seeds,
         seeds_change=seeds_change,
-        level=_calculate_level({**meta, "total_seeds_earned": meta.get("total_seeds_earned", 0) + seeds_change}),
+        level=_calculate_level({**meta, "total_seeds_earned": new_total}),
         narrative=narrative,
         badge=None,
         suggestions=_get_room_suggestions(room_info) if room_info else [{"cmd": "olhar", "desc": "ver detalhes"}],
@@ -951,6 +1000,11 @@ def _get_room_suggestions(room_info: dict) -> list[dict]:
     suggestions = [
         {"cmd": "olhar", "desc": "ver detalhes"},
     ]
+
+    missions = room_info.get("missions", []) if room_info else []
+    if missions:
+        first_mission = missions[0]
+        suggestions.append({"cmd": "responder missão", "desc": first_mission.get("title", "avançar missão")})
 
     if room_info and room_info.get("tags"):
         tags = room_info["tags"]
