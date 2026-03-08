@@ -14,6 +14,7 @@ from .. import database as db
 from ..renderer import render_markdown_to_html
 from .. import world_state
 from .. import room_manager
+from ..game_engine import _completed_challenge_ids
 
 
 router = APIRouter(tags=["pages"])
@@ -144,7 +145,7 @@ def _build_player_state(artifact: dict) -> dict:
         "seeds": meta.get("seeds", 0),
         "level": meta.get("level", 1),
         "created_at": meta.get("created_at", ""),
-        "badges": meta.get("badges", []),
+        "badges": meta.get("badges", []) if isinstance(meta.get("badges", []), list) else [],
         "completed_challenges": meta.get("completed_challenges", 0),
         "completed_missions": meta.get("completed_missions", 0),
         "total_seeds_earned": meta.get("total_seeds_earned", 0),
@@ -152,9 +153,9 @@ def _build_player_state(artifact: dict) -> dict:
         "active_challenge": meta.get("active_challenge"),
         "completed_challenge_ids": sorted(_completed_challenge_ids(meta)),
         "mission_progress": meta.get("mission_progress", {}),
-        "relationship_progress": meta.get("relationship_progress", {}),
+        "relationship_progress": meta.get("relationship_progress", {}) if isinstance(meta.get("relationship_progress", {}), dict) else {},
         "profile_signals": meta.get("profile_signals", {}),
-        "structured_profile": meta.get("structured_profile", {}),
+        "structured_profile": meta.get("structured_profile", {}) if isinstance(meta.get("structured_profile", {}), dict) else {},
     }
 
 

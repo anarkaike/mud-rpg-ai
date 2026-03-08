@@ -280,7 +280,7 @@ async def get_player_state(phone: str):
         "completed_challenge_ids": sorted(_completed_challenge_ids(meta)),
         "mission_progress": meta.get("mission_progress", {}),
         "profile_signals": profile_signals,
-        "structured_profile": structured_profile,
+        "structured_profile": structured_profile if isinstance(structured_profile, dict) else {},
         "personalization_snapshot": {
             "top_signals": profile_signals.get("top", []),
             "tone_hints": _derive_player_tone_hints(meta, profile_signals),
