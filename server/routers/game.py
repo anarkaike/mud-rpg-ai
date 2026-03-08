@@ -301,7 +301,7 @@ async def get_player_state(phone: str):
         "current_room_challenges": world_state.list_room_challenges(current_room_path, limit=12) if current_room_path else [],
         "available_rooms": [
             {
-                "path": r["path"],
+                "path": r.get("path", ""),
                 "name": rooms._extract_room_name(r.get("content", "")),
                 "tags": r.get("metadata_parsed", {}).get("tags", []),
                 "purpose": r.get("metadata_parsed", {}).get("purpose", ""),
