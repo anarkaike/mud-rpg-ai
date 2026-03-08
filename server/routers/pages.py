@@ -9,6 +9,7 @@ The AI can generate links like:
 from fastapi import APIRouter, HTTPException, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from datetime import datetime, timezone
+import hashlib
 from .. import database as db
 from ..renderer import render_markdown_to_html
 from .. import world_state
@@ -149,7 +150,7 @@ def _build_player_state(artifact: dict) -> dict:
         "total_seeds_earned": meta.get("total_seeds_earned", 0),
         "current_room": meta.get("current_room", ""),
         "active_challenge": meta.get("active_challenge"),
-        "completed_challenge_ids": meta.get("completed_challenge_ids", []),
+        "completed_challenge_ids": sorted(_completed_challenge_ids(meta)),
         "mission_progress": meta.get("mission_progress", {}),
         "relationship_progress": meta.get("relationship_progress", {}),
         "profile_signals": meta.get("profile_signals", {}),
@@ -264,6 +265,7 @@ def _render_artifact_to_html_inner(
     player_stats = None
     player_state = None
     if player_artifact:
+        from ..game_engine import _build_player_state
         player_state = _build_player_state(player_artifact)
         player_stats = {
             "nickname": player_state.get("nickname", "Viajante"),
