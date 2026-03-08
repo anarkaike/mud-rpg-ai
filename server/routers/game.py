@@ -13,8 +13,9 @@ from fastapi.responses import HTMLResponse
 
 from ..game_engine import process_action, _derive_player_tone_hints, _build_player_style_notes, _build_structured_profile_context
 from .. import database as db
-from .. import world_state
+from ..database import _resolve_player_artifact
 from .. import room_manager as rooms
+from ..game_engine import _active_challenge_from_meta
 from ..renderer import render_markdown_to_html
 
 
@@ -276,7 +277,7 @@ async def get_player_state(phone: str):
             "completed_challenges": int(meta.get("completed_challenges", 0) or 0),
             "completed_missions": int(meta.get("completed_missions", 0) or 0),
         },
-        "active_challenge": meta.get("active_challenge"),
+        "active_challenge": _active_challenge_from_meta(meta),
         "completed_challenge_ids": meta.get("completed_challenge_ids", []),
         "mission_progress": meta.get("mission_progress", {}),
         "profile_signals": profile_signals,
