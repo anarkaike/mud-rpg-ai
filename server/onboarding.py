@@ -7,6 +7,7 @@ Starts with 50 seeds, awards bonus on completion.
 
 from . import database as db
 from . import message_formatter as fmt
+from . import world_state
 from .ai_client import chat_completion_json
 
 
@@ -162,6 +163,17 @@ async def process_onboarding(phone: str, message: str) -> str:
                 message.strip(),
                 updates.get("nickname", meta.get("nickname", "Alguém")),
             )
+            world_state.record_room_block(
+                room_path="mudai.places.start",
+                author_name=updates.get("nickname", meta.get("nickname", "Alguém")),
+                author_phone=phone,
+                content=message.strip(),
+                block_type="first_fragment",
+            )
+            room_state = world_state.get_room_state("mudai.places.start")
+            room_state_meta = room_state.get("metadata_parsed", {}) if room_state else {}
+            if room_state_meta.get("image_refresh_needed"):
+                world_state.ensure_room_image_stub("mudai.places.start", reason="onboarding fragment")
 
             # Return the first room view
             return await _build_welcome_room_response(phone)
@@ -324,6 +336,7 @@ def _add_fragment_to_room(room_path: str, fragment: str, author: str):
         metadata=room.get("metadata_parsed", {}),
         is_template=False,
     )
+    world_state.refresh_room_state(room_path)
 
 
 def _check_referral_bonus(phone: str):

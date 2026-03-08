@@ -23,12 +23,23 @@ O projeto evoluiu de uma ideia mediada puramente por fluxos no n8n para um **Mot
 
 Ele transforma uma conversa pelo WhatsApp em um **MUD (Multi-User Dungeon) Moderno**, focado no poder da linguagem e das narrativas.
 
+Na implementação atual, o produto já combina:
+- engine própria em FastAPI
+- persistência por artifacts em SQLite
+- onboarding conversacional
+- salas com estado derivado de mundo vivo
+- blocos narrativos estruturados
+- memória curta anti-repetição
+- base para pool de imagens por sala
+
 ### Principais Pilares da Implementação:
 1. **Engine FastAPI Super-Rápida:** Todo o processamento mental ocorre no app Python hospedado via Docker (Coolify). O n8n / Chatwoot atua apenas como gateway que passa e recebe mensagens limpas de Webhook.
 2. **Sistema VFS Baseado em Artifacts:** Sem tabelas tradicionais relacional-engessadas. Tudo é um artefato persistido e cacheado que pode ser modificado com extrema liberdade `(mudai.users.*, mudai.places.*)`.
 3. **Onboarding Guiado e Imersivo por IA:** Ao entrar, uma inteligência artificial cria perguntas de onboarding vastamente criativas (sobre nomes, traços e essência) para evitar repetição massante, premiando dicas personalizadas instantaneamente via JSON (OpenAI flash fallback into Gemini).
 4. **Economia Textual de Sementes (🪙):** Uma moeda in-game controlada nos artefatos. Interações longas podem consumir; ser validador de interações engajadoras e trazer novos usuários bonifica e preenche seu personagem.
 5. **Perfis Públicos na Web:** Para combater a limitação das caixas apertadas do WhatsApp, links de perfil são criados por hashes (`/p/{token}`), permitindo aos usuários e estranhos visualizarem murais/tags lindamente estilizados em CSS puro.
+6. **Camada de Mundo Vivo:** Salas podem manter `evolving_summary`, `visual_summary`, `motifs`, ecos recentes e preparação de assets visuais a partir das contribuições dos jogadores.
+7. **n8n como Relay Deliberadamente Fino:** O workflow ativo apenas recebe o webhook do Chatwoot, chama `/api/v1/game/action` e devolve a resposta, deixando a inteligência e a evolução de estado no backend.
 
 ---
 

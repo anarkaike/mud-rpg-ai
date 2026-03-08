@@ -9,6 +9,7 @@ import hashlib
 from . import database as db
 from . import message_formatter as fmt
 from . import room_manager as rooms
+from . import world_state
 from .onboarding import start_onboarding, process_onboarding, _update_meta, _clean_phone
 from .ai_client import chat_completion, chat_completion_json
 
@@ -92,7 +93,10 @@ MECÂNICA DO JOGO (use para responder perguntas):
 CONTEXTO ATUAL:
 - Sala: {room_name}
 - Propósito da sala: {room_purpose}
+- Resumo vivo da sala: {room_evolving_summary}
+- Motivos recentes da sala: {room_motifs}
 - Jogador: {player_name} (Nv.{player_level}, {player_seeds} sementes)
+- Últimas respostas parecidas usadas com esse jogador: {recent_responses}
 
 {room_system_prompt}
 
@@ -297,6 +301,8 @@ async def _handle_move(phone: str, meta: dict, target: str) -> str:
     if not room_info:
         return fmt.format_error("Essa sala parece não existir... estranho.")
 
+    room_dynamic = _build_room_dynamic_suffix(room_info)
+
     # Generate short narrative
     nickname = meta.get("nickname", "Aventureiro")
     narrative = await _generate_narrative(
@@ -304,6 +310,8 @@ async def _handle_move(phone: str, meta: dict, target: str) -> str:
         player_name=nickname,
         action=f"chegou na sala",
     )
+    if room_dynamic:
+        narrative = f"{narrative} {room_dynamic}".strip()
 
     seeds = meta.get("seeds", 0) + seeds_change
 
@@ -337,6 +345,9 @@ async def _handle_look(phone: str, meta: dict) -> str:
         player_name=nickname,
         action="olha ao redor com atenção",
     )
+    room_dynamic = _build_room_dynamic_suffix(room_info)
+    if room_dynamic:
+        narrative = f"{narrative} {room_dynamic}".strip()
 
     return fmt.format_room_view(
         room_name=room_info["name"],
@@ -438,6 +449,17 @@ async def _handle_decorate(phone: str, meta: dict, message: str) -> str:
     # Add fragment
     from .onboarding import _add_fragment_to_room
     _add_fragment_to_room(current_room, fragment, nickname)
+    block = world_state.record_room_block(
+        room_path=current_room,
+        author_name=nickname,
+        author_phone=phone,
+        content=fragment,
+        block_type="decoration",
+    )
+    room_state = world_state.get_room_state(current_room)
+    state_meta = room_state.get("metadata_parsed", {}) if room_state else {}
+    if state_meta.get("image_refresh_needed"):
+        world_state.ensure_room_image_stub(current_room, reason="new decoration")
 
     # Deduct seed cost + award participation seed (net 0 first time, but tracks)
     new_seeds = seeds - SEEDS_COSTS["decorate"] + SEEDS_REWARDS["decorate"]
@@ -459,7 +481,7 @@ async def _handle_decorate(phone: str, meta: dict, message: str) -> str:
         seeds=new_seeds,
         seeds_change=net_change,
         level=_calculate_level(meta),
-        narrative=f"Você deixou sua marca: _{fragment}_ ✨",
+        narrative=_build_decoration_feedback(fragment, room_info, block),
         badge=BADGES[new_badge]["emoji"] + " " + BADGES[new_badge]["name"] if new_badge else "Fragmento adicionado!",
         suggestions=[
             {"cmd": "olhar", "desc": "ver como ficou"},
@@ -582,14 +604,18 @@ async def _handle_chat(phone: str, meta: dict, message: str) -> str:
         room_purpose = room_info.get("purpose", "")
         room_meta = room_info.get("metadata", {})
         room_system_prompt = room_meta.get("system_prompt", "")
+    recent_responses = world_state.recent_responses(f"player.{_clean_phone(phone)}", limit=4)
 
     # Build contextual prompt
     prompt = CHAT_PROMPT.format(
         room_name=room_name,
         room_purpose=room_purpose,
+        room_evolving_summary=room_info.get("evolving_summary", "") if room_info else "",
+        room_motifs=", ".join(room_info.get("motifs", [])[:4]) if room_info else "",
         player_name=nickname,
         player_level=_calculate_level(meta),
         player_seeds=meta.get("seeds", 0),
+        recent_responses=" | ".join(recent_responses) if recent_responses else "nenhuma",
         room_system_prompt=f"INSTRUÇÕES EXTRAS DA SALA:\n{room_system_prompt}" if room_system_prompt else "",
         message=message,
     )
@@ -604,6 +630,11 @@ async def _handle_chat(phone: str, meta: dict, message: str) -> str:
     except Exception as e:
         print(f"⚠️ Chat AI failed: {e}")
         narrative = "Hmm, não consegui processar isso agora. Tente de novo ou diga \"ajuda\"."
+
+    narrative = _dedupe_narrative(narrative, phone, room_info)
+    world_state.remember_response(f"player.{_clean_phone(phone)}", narrative)
+    if room_info:
+        world_state.remember_response(f"room.{room_info['path']}", narrative)
 
     # Award chat seed (max 1 per interaction)
     chat_count = meta.get("chat_count", 0) + 1
@@ -745,9 +776,11 @@ def _check_and_award_badge(phone: str, badge_id: str) -> str | None:
 
 def _generate_profile_url(phone: str) -> str:
     """Generate a profile URL with hash token."""
+    import os
+    base_url = os.environ.get("MUDAI_BASE_URL", "https://mudai.servinder.com.br")
     clean = _clean_phone(phone)
     token = hashlib.sha256(f"mudai-{clean}-2026".encode()).hexdigest()[:16]
-    return f"https://mudai.servinder.com.br/p/{token}"
+    return f"{base_url}/p/{token}"
 
 
 # ─── Helpers ──────────────────────────────────────────
@@ -777,5 +810,55 @@ def _get_room_suggestions(room_info: dict) -> list[dict]:
     else:
         suggestions.append({"cmd": "decorar", "desc": "deixar sua marca"})
 
+    recent = room_info.get("recent_contributions", []) if room_info else []
+    if recent:
+        first_type = recent[0].get("type", "fragmento")
+        suggestions.append({"cmd": "decorar", "desc": f"responder ao {first_type} recente"})
+
+    image = room_info.get("image") if room_info else None
+    if image and image.get("status") == "pending_generation":
+        suggestions.append({"cmd": "olhar", "desc": "ver a sala evoluindo"})
+
     suggestions.append({"cmd": "salas", "desc": "explorar mais"})
     return suggestions[:3]
+
+
+def _build_room_dynamic_suffix(room_info: dict | None) -> str:
+    if not room_info:
+        return ""
+    motifs = room_info.get("motifs", [])[:3]
+    highlight = room_info.get("recent_contributions", [])[:1]
+    parts = []
+    if motifs:
+        parts.append(f"O clima recente gira em torno de {', '.join(motifs)}.")
+    if highlight:
+        excerpt = highlight[0].get("excerpt", "")
+        if excerpt:
+            parts.append(f"Um eco recente ficou no ar: _{excerpt}_")
+    image = room_info.get("image")
+    if image and image.get("status") == "pending_generation":
+        parts.append("A sala está juntando detalhes para ganhar uma nova imagem.")
+    return " ".join(parts[:2])
+
+
+def _build_decoration_feedback(fragment: str, room_info: dict | None, block: dict) -> str:
+    motifs = room_info.get("motifs", [])[:3] if room_info else []
+    impact = block.get("metadata_parsed", {}).get("impact_score", 1)
+    base = f"Você deixou sua marca: _{fragment}_ ✨"
+    if motifs:
+        return f"{base} A sala agora puxa ainda mais para {', '.join(motifs)}. Impacto narrativo: {impact}."
+    return f"{base} Isso já começou a alterar o clima do lugar. Impacto narrativo: {impact}."
+
+
+def _dedupe_narrative(narrative: str, phone: str, room_info: dict | None) -> str:
+    cleaned = " ".join(narrative.split())
+    if not cleaned:
+        return narrative
+    recent = set(world_state.recent_responses(f"player.{_clean_phone(phone)}", limit=4))
+    if room_info:
+        recent.update(world_state.recent_responses(f"room.{room_info['path']}", limit=4))
+    if cleaned in recent:
+        if room_info and room_info.get("evolving_summary"):
+            return f"Vou variar: {room_info['evolving_summary']}"
+        return "Vou mudar o tom desta vez: tem algo novo se formando por aqui."
+    return cleaned

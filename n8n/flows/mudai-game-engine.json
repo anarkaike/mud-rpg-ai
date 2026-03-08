@@ -1,12 +1,9 @@
 {
   "success": true,
   "data": {
-    "updatedAt": "2026-03-08T04:47:42.339Z",
-    "createdAt": "2026-03-08T04:47:42.339Z",
     "id": "ZrlDopCOVtBTwhVa",
-    "name": "MUD-AI: Game Engine",
-    "description": null,
-    "active": false,
+    "name": "MUD-AI: Game Engine v2",
+    "active": true,
     "isArchived": false,
     "nodes": [
       {
@@ -14,239 +11,28 @@
         "name": "Chatwoot Webhook",
         "parameters": {
           "httpMethod": "POST",
+          "options": {},
           "path": "mudai-game",
-          "responseMode": "onReceived"
+          "responseMode": "lastNode"
         },
         "position": [
-          250,
+          200,
           300
         ],
         "type": "n8n-nodes-base.webhook",
-        "typeVersion": 2
+        "typeVersion": 2,
+        "webhookId": "mudai-game"
       },
       {
-        "id": "extract-message",
-        "name": "Extract Message",
+        "id": "game-action",
+        "name": "Game Action API",
         "parameters": {
-          "assignments": {
-            "assignments": [
-              {
-                "id": "msg",
-                "name": "message_text",
-                "type": "string",
-                "value": "={{ $json.body.content || $json.body.text || '' }}"
-              },
-              {
-                "id": "sender",
-                "name": "sender_phone",
-                "type": "string",
-                "value": "={{ $json.body.sender?.phone_number || $json.body.sender?.identifier || 'unknown' }}"
-              },
-              {
-                "id": "conv",
-                "name": "conversation_id",
-                "type": "string",
-                "value": "={{ String($json.body.conversation?.id || $json.body.conversation_id || '') }}"
-              },
-              {
-                "id": "acct",
-                "name": "account_id",
-                "type": "string",
-                "value": "={{ String($json.body.account?.id || $json.body.account_id || '1') }}"
-              },
-              {
-                "id": "evtype",
-                "name": "event_type",
-                "type": "string",
-                "value": "={{ $json.body.event || 'message_created' }}"
-              },
-              {
-                "id": "msgtype",
-                "name": "message_type",
-                "type": "string",
-                "value": "={{ $json.body.message_type || 'incoming' }}"
-              }
-            ]
-          },
-          "mode": "manual"
-        },
-        "position": [
-          470,
-          300
-        ],
-        "type": "n8n-nodes-base.set",
-        "typeVersion": 3.4
-      },
-      {
-        "id": "filter-incoming",
-        "name": "Only Incoming Messages",
-        "parameters": {
-          "conditions": {
-            "combinator": "and",
-            "conditions": [
-              {
-                "id": "cond1",
-                "leftValue": "={{ $json.event_type }}",
-                "operator": {
-                  "operation": "equals",
-                  "type": "string"
-                },
-                "rightValue": "message_created"
-              },
-              {
-                "id": "cond2",
-                "leftValue": "={{ $json.message_type }}",
-                "operator": {
-                  "operation": "equals",
-                  "type": "string"
-                },
-                "rightValue": "incoming"
-              }
-            ],
-            "options": {
-              "caseSensitive": true,
-              "leftValue": "",
-              "typeValidation": "strict",
-              "version": 2
-            }
-          }
-        },
-        "position": [
-          690,
-          300
-        ],
-        "type": "n8n-nodes-base.if",
-        "typeVersion": 2.2
-      },
-      {
-        "id": "get-player",
-        "name": "Get Player Profile",
-        "parameters": {
+          "authentication": "none",
           "headerParameters": {
             "parameters": [
               {
                 "name": "Authorization",
                 "value": "Bearer mudai-dev-token-2026"
-              }
-            ]
-          },
-          "method": "GET",
-          "options": {
-            "response": {
-              "response": {
-                "neverError": true
-              }
-            }
-          },
-          "sendHeaders": true,
-          "url": "=https://mudai.servinder.com.br/api/v1/artifacts/mudai.users.{{ $json.sender_phone.replace(/[^a-zA-Z0-9]/g, '') }}"
-        },
-        "position": [
-          910,
-          200
-        ],
-        "type": "n8n-nodes-base.httpRequest",
-        "typeVersion": 4.2
-      },
-      {
-        "id": "check-player-exists",
-        "name": "Player Exists?",
-        "parameters": {
-          "conditions": {
-            "combinator": "and",
-            "conditions": [
-              {
-                "id": "exists",
-                "leftValue": "={{ $json.path }}",
-                "operator": {
-                  "operation": "exists",
-                  "type": "string"
-                },
-                "rightValue": ""
-              }
-            ],
-            "options": {
-              "caseSensitive": true,
-              "leftValue": "",
-              "typeValidation": "strict",
-              "version": 2
-            }
-          }
-        },
-        "position": [
-          1130,
-          200
-        ],
-        "type": "n8n-nodes-base.if",
-        "typeVersion": 2.2
-      },
-      {
-        "id": "create-player",
-        "name": "Create Player from Template",
-        "parameters": {
-          "bodyParameters": {
-            "parameters": [
-              {
-                "name": "target_path",
-                "value": "=mudai.users.{{ $('Extract Message').item.json.sender_phone.replace(/[^a-zA-Z0-9]/g, '') }}"
-              }
-            ]
-          },
-          "contentType": "json",
-          "headerParameters": {
-            "parameters": [
-              {
-                "name": "Authorization",
-                "value": "Bearer mudai-dev-token-2026"
-              }
-            ]
-          },
-          "method": "POST",
-          "sendBody": true,
-          "sendHeaders": true,
-          "url": "https://mudai.servinder.com.br/api/v1/artifacts/mudai.templates.player/copy"
-        },
-        "position": [
-          1350,
-          350
-        ],
-        "type": "n8n-nodes-base.httpRequest",
-        "typeVersion": 4.2
-      },
-      {
-        "id": "get-current-room",
-        "name": "Get Current Room",
-        "parameters": {
-          "headerParameters": {
-            "parameters": [
-              {
-                "name": "Authorization",
-                "value": "Bearer mudai-dev-token-2026"
-              }
-            ]
-          },
-          "method": "GET",
-          "sendHeaders": true,
-          "url": "https://mudai.servinder.com.br/api/v1/artifacts/mudai.places.start"
-        },
-        "position": [
-          1570,
-          200
-        ],
-        "type": "n8n-nodes-base.httpRequest",
-        "typeVersion": 4.2
-      },
-      {
-        "id": "ai-game-master",
-        "name": "AI Game Master",
-        "parameters": {
-          "body": "={\n  \"model\": \"gpt-4o-mini\",\n  \"temperature\": 0.8,\n  \"max_tokens\": 500,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Voce e o Game Master do MUD-AI, um RPG textual via WhatsApp. Responda de forma narrativa, imersiva e concisa (maximo 3 paragrafos). Use emojis com moderacao. Descreva o ambiente, possiveis acoes e saidas disponiveis. Se o jogador e novo, de boas-vindas.\\n\\nSala Atual:\\n{{ $json.content }}\\n\\nRegras:\\n- Responda em portugues\\n- Seja acolhedor e intrigante\\n- Mencione as saidas disponiveis\\n- Sugira acoes possiveis\\n- Nunca quebre a quarta parede\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"{{ $('Extract Message').item.json.message_text }}\"\n    }\n  ]\n}",
-          "contentType": "raw",
-          "headerParameters": {
-            "parameters": [
-              {
-                "name": "Authorization",
-                "value": "=Bearer {{ $env.OPENAI_API_KEY }}"
               },
               {
                 "name": "Content-Type",
@@ -254,53 +40,36 @@
               }
             ]
           },
+          "jsonBody": "={{ { phone: ($json.body.body && $json.body.body.sender && $json.body.body.sender.phone_number) || ($json.body.sender && $json.body.sender.phone_number) || ($json.body.conversation && $json.body.conversation.meta && $json.body.conversation.meta.sender && $json.body.conversation.meta.sender.phone_number) || 'unknown', message: ($json.body.body && $json.body.body.content) || $json.body.content || 'oi', conversation_id: String(($json.body.body && $json.body.body.conversation && $json.body.body.conversation.id) || ($json.body.conversation && $json.body.conversation.id) || $json.body.conversation_id || ''), account_id: String(($json.body.body && $json.body.body.account && $json.body.body.account.id) || ($json.body.account && $json.body.account.id) || $json.body.account_id || '1') } }}",
           "method": "POST",
-          "rawContentType": "application/json",
+          "options": {
+            "response": {
+              "response": {
+                "responseFormat": "json"
+              }
+            }
+          },
           "sendBody": true,
           "sendHeaders": true,
-          "url": "https://api.openai.com/v1/chat/completions"
+          "specifyBody": "json",
+          "url": "https://mudai.servinder.com.br/api/v1/game/action"
         },
         "position": [
-          1790,
-          200
+          500,
+          300
         ],
         "type": "n8n-nodes-base.httpRequest",
         "typeVersion": 4.2
       },
       {
-        "id": "extract-ai-response",
-        "name": "Extract AI Response",
-        "parameters": {
-          "assignments": {
-            "assignments": [
-              {
-                "id": "resp",
-                "name": "ai_response",
-                "type": "string",
-                "value": "={{ $json.choices?.[0]?.message?.content || 'O Game Master esta pensando... tente novamente em instantes.' }}"
-              }
-            ]
-          },
-          "mode": "manual"
-        },
-        "position": [
-          2010,
-          200
-        ],
-        "type": "n8n-nodes-base.set",
-        "typeVersion": 3.4
-      },
-      {
-        "id": "send-chatwoot-reply",
+        "id": "send-reply",
         "name": "Send Reply via Chatwoot",
         "parameters": {
-          "body": "={\n  \"content\": \"{{ $json.ai_response.replace(/\"/g, '\\\\\"').replace(/\\n/g, '\\\\n') }}\",\n  \"message_type\": \"outgoing\",\n  \"private\": false\n}",
-          "contentType": "raw",
           "headerParameters": {
             "parameters": [
               {
                 "name": "api_access_token",
-                "value": "={{ $env.CHATWOOT_API_KEY }}"
+                "value": "RMn8YknPCgN3kzR5Jr6kWh8F"
               },
               {
                 "name": "Content-Type",
@@ -308,123 +77,40 @@
               }
             ]
           },
+          "jsonBody": "={{ { content: $json.response, message_type: 'outgoing' } }}",
           "method": "POST",
-          "rawContentType": "application/json",
+          "options": {},
           "sendBody": true,
           "sendHeaders": true,
-          "url": "=https://chatwoot.servinder.com.br/api/v1/accounts/{{ $('Extract Message').item.json.account_id }}/conversations/{{ $('Extract Message').item.json.conversation_id }}/messages"
+          "specifyBody": "json",
+          "url": "={{ 'https://chatwoot.servinder.com.br/api/v1/accounts/' + ($json.account_id || '1') + '/conversations/' + ($json.conversation_id || '') + '/messages' }}"
         },
         "position": [
-          2230,
-          200
+          800,
+          300
         ],
         "type": "n8n-nodes-base.httpRequest",
         "typeVersion": 4.2
       }
     ],
     "connections": {
-      "AI Game Master": {
-        "main": [
-          [
-            {
-              "index": 0,
-              "node": "Extract AI Response",
-              "type": "main"
-            }
-          ]
-        ]
-      },
       "Chatwoot Webhook": {
         "main": [
           [
             {
               "index": 0,
-              "node": "Extract Message",
+              "node": "Game Action API",
               "type": "main"
             }
           ]
         ]
       },
-      "Create Player from Template": {
-        "main": [
-          [
-            {
-              "index": 0,
-              "node": "Get Current Room",
-              "type": "main"
-            }
-          ]
-        ]
-      },
-      "Extract AI Response": {
+      "Game Action API": {
         "main": [
           [
             {
               "index": 0,
               "node": "Send Reply via Chatwoot",
-              "type": "main"
-            }
-          ]
-        ]
-      },
-      "Extract Message": {
-        "main": [
-          [
-            {
-              "index": 0,
-              "node": "Only Incoming Messages",
-              "type": "main"
-            }
-          ]
-        ]
-      },
-      "Get Current Room": {
-        "main": [
-          [
-            {
-              "index": 0,
-              "node": "AI Game Master",
-              "type": "main"
-            }
-          ]
-        ]
-      },
-      "Get Player Profile": {
-        "main": [
-          [
-            {
-              "index": 0,
-              "node": "Player Exists?",
-              "type": "main"
-            }
-          ]
-        ]
-      },
-      "Only Incoming Messages": {
-        "main": [
-          [
-            {
-              "index": 0,
-              "node": "Get Player Profile",
-              "type": "main"
-            }
-          ],
-          []
-        ]
-      },
-      "Player Exists?": {
-        "main": [
-          [
-            {
-              "index": 0,
-              "node": "Get Current Room",
-              "type": "main"
-            }
-          ],
-          [
-            {
-              "index": 0,
-              "node": "Create Player from Template",
               "type": "main"
             }
           ]
@@ -435,34 +121,6 @@
       "executionOrder": "v1",
       "callerPolicy": "workflowsFromSameOwner",
       "availableInMCP": false
-    },
-    "staticData": null,
-    "meta": null,
-    "pinData": null,
-    "versionId": "436642f4-c087-40a9-bb0d-7a459edc5acd",
-    "activeVersionId": null,
-    "versionCounter": 1,
-    "triggerCount": 0,
-    "shared": [
-      {
-        "updatedAt": "2026-03-08T04:47:42.339Z",
-        "createdAt": "2026-03-08T04:47:42.339Z",
-        "role": "workflow:owner",
-        "workflowId": "ZrlDopCOVtBTwhVa",
-        "projectId": "lD8gtScKeMFL2Wyo",
-        "project": {
-          "updatedAt": "2026-02-18T09:59:52.478Z",
-          "createdAt": "2026-02-18T09:59:10.908Z",
-          "id": "lD8gtScKeMFL2Wyo",
-          "name": "Junio de Almeida Vitorino <anarkaike@gmail.com>",
-          "type": "personal",
-          "icon": null,
-          "description": null,
-          "creatorId": "ec25bfa9-7955-47d0-88ac-3ed1925c52c3"
-        }
-      }
-    ],
-    "tags": [],
-    "activeVersion": null
+    }
   }
 }

@@ -8,6 +8,7 @@ navigation, and room data enrichment.
 from typing import Optional
 from . import database as db
 from . import message_formatter as fmt
+from . import world_state
 
 
 # ─── Room Discovery ──────────────────────────────────
@@ -35,6 +36,13 @@ def get_rooms_for_player(phone: str) -> list[dict]:
         room_meta = room.get("metadata_parsed", {})
         tags = room_meta.get("tags", [])
         unlock_level = room_meta.get("unlock_level", 1)
+        state = world_state.ensure_room_state(
+            room["path"],
+            room_name=_extract_room_name(room.get("content", "")),
+            purpose=room_meta.get("purpose", ""),
+            tags=tags,
+        )
+        state_meta = state.get("metadata_parsed", {})
 
         # Filter: level requirement
         if unlock_level > player_level:
@@ -66,6 +74,7 @@ def get_rooms_for_player(phone: str) -> list[dict]:
         visible.append({
             **room,
             "relevance": relevance,
+            "state": state_meta,
         })
 
     # Sort by relevance (highest first)
@@ -85,6 +94,14 @@ def get_room_info(room_path: str) -> Optional[dict]:
 
     content = room["content"]
     meta = room.get("metadata_parsed", {})
+    state = world_state.ensure_room_state(
+        room_path,
+        room_name=_extract_room_name(content),
+        purpose=meta.get("purpose", ""),
+        tags=meta.get("tags", []),
+    )
+    state_meta = state.get("metadata_parsed", {})
+    snapshot = world_state.room_dynamic_snapshot(room_path)
 
     info = {
         "path": room_path,
@@ -99,6 +116,11 @@ def get_room_info(room_path: str) -> Optional[dict]:
         "players_here": _count_players_in_room(room_path),
         "tags": meta.get("tags", []),
         "purpose": meta.get("purpose", ""),
+        "evolving_summary": state_meta.get("evolving_summary", ""),
+        "visual_summary": state_meta.get("visual_summary", ""),
+        "motifs": state_meta.get("motifs", []),
+        "recent_contributions": snapshot.get("highlight", []),
+        "image": snapshot.get("image"),
     }
     return info
 

@@ -35,7 +35,12 @@ async def chat_completion(
     Returns the assistant's response text.
     Falls back to Gemini if OpenAI fails.
     """
+    if not OPENAI_API_KEY and not GEMINI_API_KEY:
+        raise RuntimeError("No AI provider API key configured. Set OPENAI_API_KEY or GEMINI_API_KEY.")
+
     try:
+        if not OPENAI_API_KEY:
+            raise RuntimeError("OPENAI_API_KEY not configured")
         return await _openai_chat(system_prompt, user_message, model, temperature, max_tokens, json_mode)
     except Exception as e:
         print(f"⚠️ OpenAI failed: {e}")
