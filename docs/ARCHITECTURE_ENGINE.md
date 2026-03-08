@@ -60,6 +60,7 @@ O backend também cruza o que cada jogador busca com o que outros jogadores ofer
 * **Base do score:** interseção entre `seeks` e `offers`, com bônus quando os jogadores estão na mesma sala.
 * **Acesso por comando:** o engine expõe as sugestões via `/conexoes`, `conexoes` e aliases equivalentes, sem depender da interface web.
 * **Memória persistida:** cada consulta pode registrar artifacts em `mudai.users.{phone}.social_matches.{other_phone}` com score, termos em comum e contagem de vezes em que aquela conexão foi sugerida.
+* **Consulta histórica:** o backend também permite revisar essa memória social via `/historico-conexoes` e aliases equivalentes, ordenando conexões por recência e recorrência.
 * **Objetivo:** incentivar conversas, trocas e afinidades reais usando os dados já coletados no onboarding e no perfil do jogador.
 
 ---

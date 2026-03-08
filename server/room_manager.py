@@ -232,6 +232,36 @@ def persist_social_matches(phone: str, matches: list[dict]) -> list[dict]:
     return persisted_matches
 
 
+def list_social_match_history(phone: str, limit: int = 10) -> list[dict]:
+    clean = _clean_phone(phone)
+    player = db.get_artifact(f"mudai.users.{clean}")
+    if not player:
+        return []
+
+    artifacts = db.list_by_prefix(_social_matches_prefix(clean), direct_children_only=True)
+    history = []
+    for artifact in artifacts:
+        meta = artifact.get("metadata_parsed", {})
+        other_phone = meta.get("other_phone")
+        if not other_phone:
+            continue
+        history.append({
+            "phone": other_phone,
+            "nickname": meta.get("nickname", "Viajante"),
+            "score": int(meta.get("score", 0) or 0),
+            "seen_count": int(meta.get("seen_count", 0) or 0),
+            "same_room": bool(meta.get("same_room", False)),
+            "current_room": meta.get("current_room", ""),
+            "seek_matches": meta.get("seek_matches", []),
+            "offer_matches": meta.get("offer_matches", []),
+            "first_seen_at": meta.get("first_seen_at", ""),
+            "last_seen_at": meta.get("last_seen_at", ""),
+        })
+
+    history.sort(key=lambda item: (item.get("last_seen_at", ""), item.get("seen_count", 0), item.get("score", 0)), reverse=True)
+    return history[:limit]
+
+
 def find_room_by_name(name: str) -> Optional[str]:
     """
     Find a room path by partial name match.

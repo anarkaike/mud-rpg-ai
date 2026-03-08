@@ -178,6 +178,8 @@ async def process_action(phone: str, message: str) -> str:
                 return await _handle_look(phone, meta)
             case "profile":
                 return _handle_profile(phone, meta)
+            case "social_history":
+                return _handle_social_match_history(phone, meta)
             case "matches":
                 return _handle_social_matches(phone, meta)
             case "explore":
@@ -208,6 +210,12 @@ async def _handle_slash_command(phone: str, msg: str) -> str:
             return _handle_reset(phone)
         case "/ajuda" | "/help":
             return _handle_help()
+        case "/historico-conexoes" | "/histórico-conexões" | "/memoria-social" | "/memória-social":
+            clean = _clean_phone(phone)
+            player = db.get_artifact(f"mudai.users.{clean}")
+            if not player:
+                return fmt.format_error("Você ainda não tem perfil. Envie 'oi' para começar!")
+            return _handle_social_match_history(phone, player.get("metadata_parsed", {}))
         case "/conexoes" | "/conexões" | "/matches":
             clean = _clean_phone(phone)
             player = db.get_artifact(f"mudai.users.{clean}")
@@ -240,6 +248,7 @@ async def _handle_slash_command(phone: str, msg: str) -> str:
                 "Comandos disponíveis:\n"
                 "  /ajuda — ver ajuda\n"
                 "  /conexoes — ver conexões sugeridas\n"
+                "  /historico-conexoes — ver memória social\n"
                 "  /sementes — seu saldo\n"
                 "  /perfil — seu personagem\n"
                 "  /salas — explorar\n"
@@ -422,6 +431,11 @@ def _handle_social_matches(phone: str, meta: dict) -> str:
     matches = rooms.find_social_matches(phone, limit=5)
     matches = rooms.persist_social_matches(phone, matches)
     return fmt.format_social_matches(matches, profile_url=_generate_profile_url(phone))
+
+
+def _handle_social_match_history(phone: str, meta: dict) -> str:
+    history = rooms.list_social_match_history(phone, limit=8)
+    return fmt.format_social_match_history(history, profile_url=_generate_profile_url(phone))
 
 
 def _handle_explore(phone: str, meta: dict) -> str:
@@ -714,6 +728,10 @@ async def _parse_action(message: str) -> dict:
         "look": {"action": "look", "target": ""},
         "perfil": {"action": "profile", "target": ""},
         "eu": {"action": "profile", "target": ""},
+        "historico conexoes": {"action": "social_history", "target": ""},
+        "histórico conexões": {"action": "social_history", "target": ""},
+        "memoria social": {"action": "social_history", "target": ""},
+        "memória social": {"action": "social_history", "target": ""},
         "conexoes": {"action": "matches", "target": ""},
         "conexões": {"action": "matches", "target": ""},
         "matches": {"action": "matches", "target": ""},
@@ -747,6 +765,10 @@ async def _parse_action(message: str) -> dict:
     match_keywords = ["conex", "compat", "match", "quem pode me ajudar", "com quem posso falar"]
     if any(kw in msg for kw in match_keywords):
         return {"action": "matches", "target": ""}
+
+    history_keywords = ["historico de conex", "histórico de conex", "memoria social", "memória social"]
+    if any(kw in msg for kw in history_keywords):
+        return {"action": "social_history", "target": ""}
 
     # Use AI for complex messages
     try:

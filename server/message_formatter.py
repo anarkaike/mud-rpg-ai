@@ -335,6 +335,46 @@ def format_room_list(
     return "\n".join(parts)
 
 
+def format_social_match_history(history: list[dict], profile_url: str = "") -> str:
+    lines = []
+    for item in history[:8]:
+        room = item.get("current_room", "")
+        room_label = room.split(".")[-1].replace("_", " ").title() if room else "Em trânsito"
+        room_hint = "mesma sala" if item.get("same_room") else room_label
+        lines.append(
+            f"  ▸ *{item.get('nickname', 'Viajante')}* · score {item.get('score', 0)} · vista {item.get('seen_count', 0)}x"
+        )
+        lines.append(f"     _{room_hint}_")
+        seek_matches = item.get("seek_matches", [])[:2]
+        offer_matches = item.get("offer_matches", [])[:2]
+        if seek_matches:
+            lines.append(f"     _te oferece:_ {', '.join(seek_matches)}")
+        if offer_matches:
+            lines.append(f"     _busca de você:_ {', '.join(offer_matches)}")
+
+    if not lines:
+        lines.append("  ▸ Você ainda não tem histórico de conexões persistido.")
+        lines.append("     _Use /conexoes para começar a construir sua memória social._")
+
+    parts = [
+        SEP,
+        "🧠 *MEMÓRIA SOCIAL*",
+        SEP,
+        "",
+        "Seu histórico recente de conexões sugeridas:",
+        "",
+        "\n".join(lines),
+        "",
+        "💬 _Use /conexoes para renovar ou descobrir novas afinidades._",
+    ]
+
+    if profile_url:
+        parts.append(f"\n🔗 {profile_url}")
+
+    parts.append(SEP)
+    return "\n".join(parts)
+
+
 def format_welcome(first_question: str = "", first_hint: str = "") -> str:
     """
     First-time welcome message before onboarding.
