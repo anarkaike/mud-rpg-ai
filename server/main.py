@@ -240,8 +240,8 @@ O ar é fresco. Você ouve murmúrios distantes — conversas, risadas, pergunta
 
 ## Saídas
 - **norte** → Praça das Trocas
-- **leste** → Rua da Consolação
-- **oeste** → Ateliê Aberto
+- **leste** → Fogueira dos Contos
+- **oeste** → Mesa da Verdade
 - **sul** → Jardim dos Ecos
 
 ## Fragmentos
@@ -252,7 +252,16 @@ _Seja o primeiro a deixar sua marca aqui._
 *Sala inicial — comunidade padrão*
 """,
             "is_template": False,
-            "metadata": {"is_start": True, "community": "default"},
+            "metadata": {
+                "is_start": True,
+                "community": "default",
+                "exits": [
+                    {"direction": "norte", "name": "Praça das Trocas"},
+                    {"direction": "leste", "name": "Fogueira dos Contos"},
+                    {"direction": "oeste", "name": "Mesa da Verdade"},
+                    {"direction": "sul", "name": "Jardim dos Ecos"},
+                ],
+            },
         },
         # System config
         {
@@ -262,14 +271,6 @@ _Seja o primeiro a deixar sua marca aqui._
 Você acaba de entrar num mundo feito de palavras, histórias e conexões.
 
 Aqui, o que importa é a sua essência — não a aparência.
-
-**Comandos básicos:**
-- Diga *"olhar"* para ver onde você está
-- Diga *"norte"*, *"sul"*, *"leste"* ou *"oeste"* para se mover
-- Diga *"perfil"* para ver seu personagem
-- Diga *"ajuda"* para mais opções
-
-> Cada interação é uma semente. O que você planta?
 """,
             "is_template": False,
             "metadata": {"type": "system", "description": "Mensagem de boas-vindas"},
@@ -344,7 +345,7 @@ Paz profunda. O vento carrega fragments de pensamentos. Aqui, o silêncio fala m
 
 ## Saídas
 - **norte** → Recepção
-- **leste** → Espelho d\'Água
+- **leste** → Espelho d'Água
 
 ## Fragmentos
 _O jardim aguarda suas reflexões..._
@@ -399,7 +400,7 @@ Energia vibrante. Vozes se cruzam em conversas empolgadas. O ar cheira a possibi
 ## Saídas
 - **sul** → Recepção
 - **leste** → Bancada do Empreendedor
-- **oeste** → Espelho d\'Água
+- **oeste** → Espelho d'Água
 
 ## Fragmentos
 _A praça espera sua oferta..._
@@ -587,7 +588,7 @@ Percepção alterada. O tempo se dilata. As fronteiras entre o interno e o exter
 
 ## Saídas
 - **norte** → Jardim dos Ecos
-- **oeste** → Espelho d\'Água
+- **oeste** → Espelho d'Água
 
 ## Fragmentos
 _O portal espera sua expansão..._

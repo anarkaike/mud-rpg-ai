@@ -167,7 +167,6 @@ def format_onboarding_step(
 
     parts += [
         "",
-        f"💬 _Responda livremente_",
         SEP,
     ]
     return "\n".join(parts)

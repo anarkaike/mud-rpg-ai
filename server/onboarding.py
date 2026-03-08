@@ -323,8 +323,8 @@ async def _build_welcome_room_response(phone: str) -> str:
         narrative=f"Bem-vindo, *{nickname}*! Seu perfil está pronto. Você ganhou 🌱 *Primeiro Passo* e {INITIAL_SEEDS + 3} sementes. Bora explorar!",
         exits=[
             {"direction": "norte", "name": "Praça das Trocas"},
-            {"direction": "leste", "name": "Rua da Consolação"},
-            {"direction": "oeste", "name": "Ateliê Aberto"},
+            {"direction": "leste", "name": "Fogueira dos Contos"},
+            {"direction": "oeste", "name": "Mesa da Verdade"},
             {"direction": "sul", "name": "Jardim dos Ecos"},
         ],
         suggestions=[
