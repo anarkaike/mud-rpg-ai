@@ -629,7 +629,7 @@ async def _handle_look(phone: str, meta: dict) -> str:
         return fmt.format_error("Você parece estar... em lugar nenhum. Diga \"salas\" para explorar.")
 
     nickname = meta.get("nickname", "Aventureiro")
-    active_challenge = _ensure_active_challenge(phone, meta, room_info, trigger="look")
+    active_challenge = await _ensure_active_challenge(phone, meta, room_info, trigger="look")
     narrative = await _generate_narrative(
         room_name=room_info["name"],
         player_name=nickname,
@@ -1842,7 +1842,7 @@ def _generate_profile_url(phone: str) -> str:
 async def _attach_room_challenge(phone: str, meta: dict, room_info: dict | None, response: str, trigger: str, challenge: dict | None = None) -> str:
     if not room_info:
         return response
-    challenge = challenge or _ensure_active_challenge(phone, meta, room_info, trigger=trigger)
+    challenge = challenge or await _ensure_active_challenge(phone, meta, room_info, trigger=trigger)
     if not challenge:
         return response
     challenge_text = fmt.format_challenge(
@@ -1856,7 +1856,7 @@ async def _attach_room_challenge(phone: str, meta: dict, room_info: dict | None,
     return f"{response}\n\n{challenge_text}"
 
 
-def _ensure_active_challenge(phone: str, meta: dict, room_info: dict, trigger: str) -> dict | None:
+async def _ensure_active_challenge(phone: str, meta: dict, room_info: dict, trigger: str) -> dict | None:
     current_room = room_info.get("path")
     active = meta.get("active_challenge")
     if active and active.get("status") == "active" and active.get("room_path") == current_room:
@@ -1874,7 +1874,7 @@ def _ensure_active_challenge(phone: str, meta: dict, room_info: dict, trigger: s
     if mission:
         challenge = _build_room_mission_challenge(mission, meta)
     else:
-        _ensure_room_challenge_pool(room_info, meta)
+        await _ensure_room_challenge_pool(room_info, meta)
         challenge = _select_room_challenge_for_player(room_info, meta)
     if not challenge:
         return None
@@ -2014,6 +2014,35 @@ def _skipped_challenge_ids(meta: dict) -> set[str]:
     if not isinstance(items, list):
         return set()
     return {str(item) for item in items if item}
+
+
+def _skipped_challenge_ids_by_room(meta: dict, room_path: str) -> set[str]:
+    scoped = meta.get("skipped_challenge_ids_by_room", {})
+    if not isinstance(scoped, dict):
+        return set()
+    items = scoped.get(room_path, [])
+    if not isinstance(items, list):
+        return set()
+    return {str(item) for item in items if item}
+
+
+def _with_skipped_challenge_for_room(meta: dict, room_path: str, challenge_id: str) -> dict:
+    scoped = meta.get("skipped_challenge_ids_by_room", {})
+    scoped = dict(scoped) if isinstance(scoped, dict) else {}
+    room_items = scoped.get(room_path, [])
+    room_items = [str(item) for item in room_items if item]
+    if challenge_id and challenge_id not in room_items:
+        room_items.append(challenge_id)
+    scoped[room_path] = room_items[-20:]
+
+    global_items = list(_skipped_challenge_ids(meta))
+    if challenge_id and challenge_id not in global_items:
+        global_items.append(challenge_id)
+
+    return {
+        "skipped_challenge_ids": global_items[-40:],
+        "skipped_challenge_ids_by_room": scoped,
+    }
 
 
 def _is_challenge_rotation_request(normalized: str) -> bool:
@@ -2162,12 +2191,12 @@ def _normalize_generated_challenge_specs(items: list[dict], room_info: dict, pla
     return normalized
 
 
-def _ensure_room_challenge_pool(room_info: dict, player_meta: dict | None = None, min_active: int = 6) -> list[dict]:
+async def _ensure_room_challenge_pool(room_info: dict, player_meta: dict | None = None, min_active: int = 6) -> list[dict]:
     room_path = room_info.get("path", "")
     active = world_state.list_room_challenges(room_path, limit=50)
     if len(active) >= min_active:
         return active
-    specs = _fallback_room_challenge_specs(room_info, player_meta)
+    specs = await _generate_dynamic_room_challenge_specs(room_info, player_meta)
     specs = _normalize_generated_challenge_specs(specs, room_info, player_meta)
     context = world_state.build_room_challenge_context(room_path)
     for spec in specs:
@@ -2195,7 +2224,7 @@ def _select_room_challenge_for_player(room_info: dict, meta: dict, excluded_ids:
     completed_ids = _completed_challenge_ids(meta)
     completed_novelty = _completed_challenge_novelty_keys(meta)
     seen_ids = _seen_challenge_ids(meta)
-    skipped_ids = _skipped_challenge_ids(meta)
+    skipped_ids = _skipped_challenge_ids_by_room(meta, room_path) or _skipped_challenge_ids(meta)
     excluded = set(excluded_ids or set())
     scored = []
     for challenge in challenges:
@@ -2229,14 +2258,12 @@ def _resolve_active_challenge(phone: str, meta: dict, message: str, challenge: d
         return None
     if _is_challenge_rotation_request(normalized):
         room_info = rooms.get_room_info(challenge.get("room_path", meta.get("current_room", "mudai.places.start")))
+        room_path = challenge.get("room_path", meta.get("current_room", "mudai.places.start"))
         challenge_id = str(challenge.get("id", "") or "")
-        skipped_ids = list(_skipped_challenge_ids(meta))
-        if challenge_id and challenge_id not in skipped_ids:
-            skipped_ids.append(challenge_id)
         updates = {
             "active_challenge": None,
-            "skipped_challenge_ids": skipped_ids[-40:],
         }
+        updates.update(_with_skipped_challenge_for_room(meta, room_path, challenge_id))
         next_challenge = None
         if room_info and not challenge.get("mission_id"):
             next_challenge = _select_room_challenge_for_player(room_info, {**meta, **updates}, excluded_ids={challenge_id} if challenge_id else None)
