@@ -245,6 +245,10 @@ async def process_action(phone: str, message: str) -> str:
         challenge_response = _resolve_active_challenge(phone, meta, message, active_challenge)
         if challenge_response:
             return challenge_response
+    elif _is_challenge_rotation_request(msg.lower()):
+        challenge_response = await _activate_room_challenge_from_idle(phone, meta, message)
+        if challenge_response:
+            return challenge_response
 
     # 3. Parse player intent
     action = await _parse_action(message, meta)
@@ -1888,6 +1892,47 @@ async def _ensure_active_challenge(phone: str, meta: dict, room_info: dict, trig
         "seen_challenge_ids": seen_ids[-40:],
     })
     return challenge
+
+
+async def _activate_room_challenge_from_idle(phone: str, meta: dict, message: str) -> str | None:
+    current_room = meta.get("current_room", "mudai.places.start")
+    room_info = rooms.get_room_info(current_room)
+    if not room_info:
+        return None
+    challenge = await _ensure_active_challenge(phone, meta, room_info, trigger="look")
+    if not challenge:
+        return fmt.format_interaction(
+            room_name=room_info.get("name", "Sala"),
+            action_label="Desafio indisponível",
+            seeds=meta.get("seeds", 0),
+            seeds_change=0,
+            level=_calculate_level(meta),
+            narrative="Tentei puxar um desafio para esta sala, mas por enquanto não apareceu nenhum bom. Você pode explorar, olhar a sala ou tentar de novo daqui a pouco.",
+            badge=None,
+            suggestions=_get_room_suggestions(room_info),
+            breadcrumb=(room_info.get("name", "Sala")).replace("🌱 ", ""),
+            profile_url=_generate_profile_url(phone),
+        )
+    action_label = "Desafio ativado"
+    normalized = message.strip().lower()
+    if normalized != "pular":
+        action_label = "Desafio renovado"
+    suggestions = _get_room_suggestions(room_info, active_challenge=challenge)
+    return fmt.format_interaction(
+        room_name=challenge.get("room_name", room_info.get("name", "Sala")),
+        action_label=action_label,
+        seeds=meta.get("seeds", 0),
+        seeds_change=0,
+        level=_calculate_level(meta),
+        narrative=(
+            f"Separei um desafio para você nesta sala. "
+            f"Se quiser, o atual é *{challenge.get('title', 'Desafio')}*: {challenge.get('instruction', '')}"
+        ),
+        badge=None,
+        suggestions=suggestions,
+        breadcrumb=(challenge.get("room_name", room_info.get("name", "Sala"))).replace("🌱 ", ""),
+        profile_url=_generate_profile_url(phone),
+    )
 
 
 def _build_room_challenge(room_info: dict, player_meta: dict | None = None) -> dict | None:
