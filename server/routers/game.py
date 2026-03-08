@@ -35,8 +35,6 @@ async def game_action(body: GameActionRequest):
     """
     Process a player action and return a formatted response.
     """
-    print(f"📥 Received game action: phone={body.phone}, conv_id={body.conversation_id}, acc_id={body.account_id}")
-    
     if not body.phone or not body.message:
         raise HTTPException(status_code=400, detail="phone and message are required")
 
@@ -48,8 +46,8 @@ async def game_action(body: GameActionRequest):
 
         return GameActionResponse(
             response=response_text,
-            conversation_id=body.conversation_id or "",
-            account_id=body.account_id or "1",
+            conversation_id=body.conversation_id,
+            account_id=body.account_id,
         )
 
     except Exception as e:
