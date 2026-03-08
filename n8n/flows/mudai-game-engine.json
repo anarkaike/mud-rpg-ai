@@ -139,7 +139,7 @@
             }
           },
           "sendHeaders": true,
-          "url": "=http://mudai-server:8000/api/v1/artifacts/mudai.users.{{ $json.sender_phone.replace(/[^a-zA-Z0-9]/g, '') }}"
+          "url": "=https://mudai.servinder.com.br/api/v1/artifacts/mudai.users.{{ $json.sender_phone.replace(/[^a-zA-Z0-9]/g, '') }}"
         },
         "position": [
           910,
@@ -204,7 +204,7 @@
           "method": "POST",
           "sendBody": true,
           "sendHeaders": true,
-          "url": "http://mudai-server:8000/api/v1/artifacts/mudai.templates.player/copy"
+          "url": "https://mudai.servinder.com.br/api/v1/artifacts/mudai.templates.player/copy"
         },
         "position": [
           1350,
@@ -227,7 +227,7 @@
           },
           "method": "GET",
           "sendHeaders": true,
-          "url": "http://mudai-server:8000/api/v1/artifacts/mudai.places.start"
+          "url": "https://mudai.servinder.com.br/api/v1/artifacts/mudai.places.start"
         },
         "position": [
           1570,
