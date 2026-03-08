@@ -284,7 +284,7 @@ async def get_player_state(phone: str):
         "profile_signals": profile_signals,
         "structured_profile": structured_profile if isinstance(structured_profile, dict) else {},
         "personalization_snapshot": {
-            "top_signals": profile_signals.get("top", []),
+            "top_signals": profile_signals.get("top", []) if isinstance(profile_signals.get("top", []), list) else [],
             "tone_hints": _derive_player_tone_hints(meta, profile_signals),
             "style_notes": style_notes,
             "profile_summary": structured_profile_context.get("summary", ""),
