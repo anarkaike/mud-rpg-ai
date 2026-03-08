@@ -201,6 +201,26 @@ def move_player(phone: str, target_room: str) -> bool:
     if target_room not in visited:
         visited.append(target_room)
         meta["rooms_visited"] = visited
+        
+        # Add to game log when someone new arrives
+        from datetime import datetime
+        time_str = datetime.now().strftime("%H:%M")
+        log_entry = {
+            "time": time_str,
+            "text": f'<span class="log-accent">{meta.get("nickname", "Alguém")}</span> explorou este lugar pela primeira vez.',
+            "type": "discovery"
+        }
+        world_state._add_to_game_log(target_room, log_entry)
+    else:
+        # Standard arrival log
+        from datetime import datetime
+        time_str = datetime.now().strftime("%H:%M")
+        log_entry = {
+            "time": time_str,
+            "text": f'<span class="log-accent">{meta.get("nickname", "Alguém")}</span> entrou na sala.',
+            "type": "arrival"
+        }
+        world_state._add_to_game_log(target_room, log_entry)
 
     db.put_artifact(
         path=player_path,

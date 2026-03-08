@@ -601,6 +601,7 @@ def _wrap_in_template(body_html: str, title: str, path: str, player_stats: Optio
             padding: 0.25rem 0.5rem;
             border-left: 2px solid var(--border);
             transition: all 0.3s;
+            cursor: pointer;
         }}
 
         .log-entry.new {{
@@ -617,8 +618,27 @@ def _wrap_in_template(body_html: str, title: str, path: str, player_stats: Optio
         .log-time {{ color: var(--text-muted); font-size: 0.75rem; margin-right: 0.5rem; }}
         .log-text {{ color: var(--text-secondary); }}
         .log-accent {{ color: var(--accent); font-weight: 500; }}
+        .log-entry:hover {{
+            background: rgba(56, 189, 248, 0.1);
+            border-left-color: var(--accent);
+            transform: translateX(5px);
+        }}
 
-        .room-image-container:hover .room-visual {{
+        .game-log::-webkit-scrollbar {{
+            width: 4px;
+        }}
+
+        .game-log::-webkit-scrollbar-track {{
+            background: transparent;
+        }}
+
+        .game-log::-webkit-scrollbar-thumb {{
+            background: var(--border);
+            border-radius: 10px;
+        }}
+
+        /* Visual polish for images and gallery */
+        .gallery-thumb {{
             filter: brightness(1);
         }}
 

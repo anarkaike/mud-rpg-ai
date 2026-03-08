@@ -111,15 +111,15 @@ def record_room_block(
 
 def _add_to_game_log(room_path: str, entry: dict, limit: int = 15):
     """Add an entry to the room's persistent game log."""
-    state = get_room_state(room_path)
+    state = ensure_room_state(room_path)
     if not state:
         return
-    
+
     meta = state.get("metadata_parsed", {})
     log = meta.get("game_log", [])
     log.insert(0, entry)
     meta["game_log"] = log[:limit]
-    
+
     db.put_artifact(path=state["path"], content=state["content"], metadata=meta)
 
 
