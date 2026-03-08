@@ -2016,6 +2016,18 @@ def _skipped_challenge_ids(meta: dict) -> set[str]:
     return {str(item) for item in items if item}
 
 
+def _is_challenge_rotation_request(normalized: str) -> bool:
+    aliases = {
+        "pular",
+        "skip",
+        "trocar desafio",
+        "novo desafio",
+        "renovar desafio",
+        "outro desafio",
+    }
+    return normalized in aliases
+
+
 def _challenge_type_label(challenge_type: str) -> str:
     mapping = {
         "reflexão": "reflexão",
@@ -2215,7 +2227,7 @@ def _resolve_active_challenge(phone: str, meta: dict, message: str, challenge: d
     normalized = text.lower()
     if not text:
         return None
-    if normalized in {"pular", "skip"}:
+    if _is_challenge_rotation_request(normalized):
         room_info = rooms.get_room_info(challenge.get("room_path", meta.get("current_room", "mudai.places.start")))
         challenge_id = str(challenge.get("id", "") or "")
         skipped_ids = list(_skipped_challenge_ids(meta))
@@ -2238,14 +2250,20 @@ def _resolve_active_challenge(phone: str, meta: dict, message: str, challenge: d
         _update_meta(phone, updates)
         suggestions = _get_room_suggestions(room_info, active_challenge=next_challenge) if room_info else [{"cmd": "olhar", "desc": "ver detalhes"}]
         narrative = "Tudo bem. Você pode continuar explorando e pegar outro desafio mais tarde."
+        action_label = "Desafio ignorado"
         if next_challenge:
             narrative = (
                 f"Tudo bem. Deixei o desafio anterior de lado. "
                 f"Se quiser, o próximo é *{next_challenge.get('title', 'Desafio')}*: {next_challenge.get('instruction', '')}"
             )
+            if normalized != "pular":
+                action_label = "Desafio renovado"
+        elif normalized != "pular":
+            narrative = "Certo. Tentei renovar o desafio, mas por enquanto não apareceu outro melhor. Você pode explorar a sala ou responder depois."
+            action_label = "Desafio renovado"
         return fmt.format_interaction(
             room_name=challenge.get("room_name", room_info["name"] if room_info else "Sala"),
-            action_label="Desafio ignorado",
+            action_label=action_label,
             seeds=meta.get("seeds", 0),
             seeds_change=0,
             level=_calculate_level(meta),
@@ -2353,13 +2371,14 @@ def _get_room_suggestions(room_info: dict, active_challenge: dict | None = None)
 
     if active_challenge:
         suggestions.append({"cmd": "responder desafio", "desc": active_challenge.get("title", "encarar desafio ativo")})
+        suggestions.append({"cmd": "trocar desafio", "desc": "pedir outro desafio"})
         suggestions.append({"cmd": "pular", "desc": "ignorar o desafio atual"})
     else:
         challenges = room_info.get("challenges", []) if room_info else []
         if challenges:
             first_challenge = challenges[0]
             suggestions.append({"cmd": "responder desafio", "desc": first_challenge.get("title", "encarar desafio ativo")})
-            suggestions.append({"cmd": "pular", "desc": "ignorar o desafio atual"})
+            suggestions.append({"cmd": "novo desafio", "desc": "pedir outro desafio"})
 
     missions = room_info.get("missions", []) if room_info else []
     if missions and not active_challenge:
