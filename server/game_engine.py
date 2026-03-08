@@ -1888,7 +1888,6 @@ async def _ensure_active_challenge(phone: str, meta: dict, room_info: dict, trig
         seen_ids.append(challenge_id)
     _update_meta(phone, {
         "active_challenge": challenge,
-        "last_challenge_room": current_room,
         "seen_challenge_ids": seen_ids[-40:],
     })
     return challenge
@@ -2396,7 +2395,6 @@ def _resolve_active_challenge(phone: str, meta: dict, message: str, challenge: d
         "total_seeds_earned": new_total,
         "completed_challenges": completed,
         "active_challenge": None,
-        "last_completed_challenge_id": challenge.get("id", ""),
         "completed_challenge_ids": completed_ids[-80:],
         "completed_challenge_novelty_keys": completed_novelty[-80:],
     }
