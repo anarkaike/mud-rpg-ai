@@ -89,11 +89,33 @@ async def render_page(path: str):
 
     # Extract a nice title
     title = path.split(".")[-1].replace("-", " ").title()
-    if artifact.get("metadata_parsed", {}).get("nickname"):
-        title = artifact["metadata_parsed"]["nickname"]
+    meta = artifact.get("metadata_parsed", {})
+    if meta.get("nickname"):
+        title = meta["nickname"]
+
+    # Substitute template placeholders if this is a user profile
+    content = artifact["content"]
+    if path.startswith("mudai.users."):
+        import re
+        def replace_var(match):
+            key = match.group(1)
+            # Map template keys to metadata keys where they differ slightly
+            key_map = {
+                "habilidades_ofereco": "offers",
+                "habilidades_busco": "seeks",
+                "tracos": "essence",
+                "avatar_textual": "avatar"
+            }
+            actual_key = key_map.get(key, key)
+            val = meta.get(actual_key)
+            if not val:
+                return "_ainda não descoberto_"
+            return str(val)
+        
+        content = re.sub(r'\{([a-zA-Z0-9_]+)\}', replace_var, content)
 
     html = render_markdown_to_html(
-        content=artifact["content"],
+        content=content,
         title=title,
         path=path,
     )
