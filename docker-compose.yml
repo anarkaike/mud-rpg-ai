@@ -1,0 +1,27 @@
+services:
+  mudai-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mudai-server
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - mudai-data:/app/server/data
+    environment:
+      - API_TOKEN=${API_TOKEN:-mudai-dev-token-2026}
+      - MUDAI_DB_PATH=/app/server/data/mudai.db
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - CHATWOOT_API_KEY=${CHATWOOT_API_KEY}
+      - CHATWOOT_BASE_URL=${CHATWOOT_BASE_URL:-https://chatwoot.servinder.com.br}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  mudai-data:
+    driver: local
