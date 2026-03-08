@@ -152,7 +152,7 @@ def _build_player_state(artifact: dict) -> dict:
         "current_room": meta.get("current_room", ""),
         "active_challenge": meta.get("active_challenge"),
         "completed_challenge_ids": sorted(_completed_challenge_ids(meta)),
-        "mission_progress": meta.get("mission_progress", {}),
+        "mission_progress": meta.get("mission_progress", {}) if isinstance(meta.get("mission_progress", {}), dict) else {},
         "relationship_progress": meta.get("relationship_progress", {}) if isinstance(meta.get("relationship_progress", {}), dict) else {},
         "profile_signals": meta.get("profile_signals", {}),
         "structured_profile": meta.get("structured_profile", {}) if isinstance(meta.get("structured_profile", {}), dict) else {},

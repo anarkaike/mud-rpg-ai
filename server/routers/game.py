@@ -56,14 +56,16 @@ def _resolve_player_artifact(player_identifier: str) -> Optional[dict]:
 
 def _find_phone_by_token(token: str) -> Optional[str]:
     """Find a player phone by its hashed token."""
+    print(f"DEBUG: Looking for token: {token}")
     users = db.list_by_prefix("mudai.users.", direct_children_only=True)
+    print(f"DEBUG: Found {len(users)} users")
     for user in users:
         clean = user["path"].split(".")[-1]
         user_token = hashlib.sha256(f"mudai-{clean}-2026".encode()).hexdigest()[:16]
         if user_token == token:
-            # Recover phone (assuming the path suffix is the clean phone)
-            # This is a bit hacky but consistent with how users are stored
+            print(f"DEBUG: Found match: {clean}")
             return clean
+    print(f"DEBUG: No match found for token: {token}")
     return None
 
 
@@ -278,7 +280,7 @@ async def get_player_state(phone: str):
         },
         "active_challenge": _active_challenge_from_meta(meta),
         "completed_challenge_ids": sorted(_completed_challenge_ids(meta)),
-        "mission_progress": meta.get("mission_progress", {}),
+        "mission_progress": meta.get("mission_progress", {}) if isinstance(meta.get("mission_progress", {}), dict) else {},
         "profile_signals": profile_signals,
         "structured_profile": structured_profile if isinstance(structured_profile, dict) else {},
         "personalization_snapshot": {
