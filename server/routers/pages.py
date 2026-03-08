@@ -136,12 +136,22 @@ def _build_player_state(artifact: dict) -> dict:
     meta = artifact.get("metadata_parsed", {})
     return {
         "nickname": meta.get("nickname", "Viajante"),
+        "avatar": meta.get("avatar", ""),
+        "essence": meta.get("essence", ""),
+        "offers": meta.get("offers", ""),
+        "seeks": meta.get("seeks", ""),
         "seeds": meta.get("seeds", 0),
         "level": meta.get("level", 1),
+        "created_at": meta.get("created_at", ""),
+        "badges": meta.get("badges", []),
+        "completed_challenges": meta.get("completed_challenges", 0),
+        "completed_missions": meta.get("completed_missions", 0),
+        "total_seeds_earned": meta.get("total_seeds_earned", 0),
         "current_room": meta.get("current_room", ""),
         "active_challenge": meta.get("active_challenge"),
         "completed_challenge_ids": meta.get("completed_challenge_ids", []),
         "mission_progress": meta.get("mission_progress", {}),
+        "relationship_progress": meta.get("relationship_progress", {}),
         "profile_signals": meta.get("profile_signals", {}),
         "structured_profile": meta.get("structured_profile", {}),
     }
@@ -208,7 +218,14 @@ Confira a mensagem recebida no WhatsApp e tente novamente.
     return RedirectResponse(url=f"/p/{token}", status_code=303)
 
 
-def _render_artifact_to_html_inner(artifact: dict, path: str, session_token: str | None = None, player_artifact: dict | None = None) -> str:
+def _render_artifact_to_html_inner(
+    artifact: dict,
+    path: str,
+    session_token: str | None = None,
+    player_artifact: dict | None = None,
+    active_tab: str = "room",
+    highlight_block_id: str = "",
+) -> str:
     """Helper to render an artifact to HTML (inner container only)."""
     # Extract a nice title
     title = path.split(".")[-1].replace("-", " ").title()
@@ -277,11 +294,13 @@ def _render_artifact_to_html_inner(artifact: dict, path: str, session_token: str
         player_stats=player_stats,
         player_state=player_state,
         players_here=players_here,
+        active_tab=active_tab,
+        highlight_block_id=highlight_block_id,
     )
 
 
 @router.get("/p/{path:path}", response_class=HTMLResponse)
-async def render_page(path: str):
+async def render_page(path: str, tab: str | None = None, highlight: str | None = None):
     """
     Render an artifact as a public HTML page.
     Supports both direct dot-paths and 16-char hashed profile tokens.
@@ -313,6 +332,7 @@ async def render_page(path: str):
     # Fetch player stats if session token is provided
     player_stats = None
     player_state = None
+    active_tab = tab or "room"
     if len(original_path) == 16:
         user_artifact = _find_user_by_token(original_path)
         if user_artifact:
@@ -322,6 +342,17 @@ async def render_page(path: str):
                 "seeds": player_state.get("seeds", 0),
                 "level": player_state.get("level", 1),
             }
+            current_room_path = player_state.get("current_room", "mudai.places.start") or "mudai.places.start"
+            if active_tab != "profile":
+                room_artifact = db.get_artifact(current_room_path)
+                if room_artifact:
+                    artifact = room_artifact
+                    path = current_room_path
+                    room_state = world_state.room_dynamic_snapshot(path)
+                    players_here = room_manager.get_players_in_room(path)
+                active_tab = active_tab if active_tab in {"room", "challenges", "social"} else "room"
+            else:
+                active_tab = "profile"
 
     # For full pages, we want the outer wrapper too
     # Extract title from meta for the wrapper
@@ -355,5 +386,7 @@ async def render_page(path: str):
         player_stats=player_stats,
         player_state=player_state,
         players_here=players_here,
+        active_tab=active_tab,
+        highlight_block_id=(highlight or "").strip(),
     )
     return HTMLResponse(content=full_html)

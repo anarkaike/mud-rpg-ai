@@ -67,6 +67,26 @@ def _find_phone_by_token(token: str) -> Optional[str]:
     return None
 
 
+def _active_tab_for_message(message: str) -> str:
+    lowered = (message or "").strip().lower()
+    if lowered in {"perfil", "profile", "me", "eu"}:
+        return "profile"
+    if lowered in {"desafios", "challenge", "challenges", "missoes", "missões"}:
+        return "challenges"
+    if lowered in {"rede", "social", "encontros", "pessoas"}:
+        return "social"
+    return "room"
+
+
+def _latest_room_highlight_id(room_path: str) -> str:
+    snapshot = world_state.room_dynamic_snapshot(room_path)
+    state = snapshot.get("state", {}) if isinstance(snapshot.get("state", {}), dict) else {}
+    recent = state.get("recent_contributions", []) if isinstance(state.get("recent_contributions", []), list) else []
+    if not recent:
+        return ""
+    return str(recent[0].get("id", "") or "")
+
+
 @router.post("/game/web-action")
 async def web_action(
     token: str = Form(...),
@@ -93,8 +113,10 @@ async def web_action(
     meta = player.get("metadata_parsed", {})
     current_room_path = meta.get("current_room", "mudai.places.start")
     
+    active_tab = _active_tab_for_message(message)
+
     # If the action was 'profile', show the profile
-    if message.lower() in ["perfil", "profile", "me", "eu"]:
+    if active_tab == "profile":
         target_path = player_path
     elif message.lower() in ["salas", "rooms", "explore", "explorar"]:
         # Show the index page content for rooms? 
@@ -112,8 +134,19 @@ async def web_action(
     # For HTMX, we just need the inner HTML of the container
     # But let's use the full renderer logic if possible
     from .pages import _render_artifact_to_html_inner
-    
-    html_inner = _render_artifact_to_html_inner(artifact, target_path, session_token=token, player_artifact=player)
+
+    highlight_block_id = ""
+    if active_tab == "room" and current_room_path:
+        highlight_block_id = _latest_room_highlight_id(current_room_path)
+
+    html_inner = _render_artifact_to_html_inner(
+        artifact,
+        target_path,
+        session_token=token,
+        player_artifact=player,
+        active_tab=active_tab,
+        highlight_block_id=highlight_block_id,
+    )
     return HTMLResponse(content=html_inner)
 
 
@@ -145,7 +178,14 @@ async def web_sync(token: str):
         artifact = db.get_artifact("mudai.places.start")
 
     from .pages import _render_artifact_to_html_inner
-    html_inner = _render_artifact_to_html_inner(artifact, current_room_path, session_token=token, player_artifact=player)
+    html_inner = _render_artifact_to_html_inner(
+        artifact,
+        current_room_path,
+        session_token=token,
+        player_artifact=player,
+        active_tab="room",
+        highlight_block_id=_latest_room_highlight_id(current_room_path),
+    )
     
     # Calculate hash to check for changes
     content_hash = hashlib.md5(html_inner.encode()).hexdigest()

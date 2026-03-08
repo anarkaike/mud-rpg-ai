@@ -113,6 +113,46 @@ def list_room_challenges(room_path: str, limit: int = 20, include_archived: bool
     return challenges[:limit]
 
 
+def ensure_room_challenges(
+    room_path: str,
+    room_name: str = "",
+    purpose: str = "",
+    tags: Optional[list[str]] = None,
+    motifs: Optional[list[str]] = None,
+    min_active: int = 3,
+) -> list[dict]:
+    existing = list_room_challenges(room_path, limit=50)
+    if len(existing) >= min_active:
+        return existing
+
+    state = ensure_room_state(room_path, room_name=room_name, purpose=purpose, tags=tags)
+    state_meta = state.get("metadata_parsed", {})
+    specs = _build_room_challenge_specs(
+        room_path=room_path,
+        room_name=room_name or state_meta.get("room_name", room_path),
+        purpose=purpose or state_meta.get("purpose", ""),
+        tags=tags or state_meta.get("tags", []),
+        motifs=motifs or state_meta.get("motifs", []),
+    )
+    for spec in specs:
+        create_room_challenge(
+            room_path=room_path,
+            title=spec["title"],
+            instruction=spec["instruction"],
+            challenge_type=spec["challenge_type"],
+            reward_seeds=spec["reward_seeds"],
+            source="dynamic_challenge",
+            novelty_key=spec["novelty_key"],
+            prompt_fingerprint=spec.get("prompt_fingerprint", ""),
+            generator_version=spec.get("generator_version", 1),
+            relevance_score=spec.get("relevance_score", 0.5),
+            created_from_block_ids=[],
+            created_from_recent_players=list(dict.fromkeys(state_meta.get("recent_authors", [])))[:6],
+        )
+    refresh_room_state(room_path)
+    return list_room_challenges(room_path, limit=50)
+
+
 def ensure_room_missions(room_path: str, room_name: str = "", purpose: str = "", tags: Optional[list[str]] = None) -> list[dict]:
     existing = db.list_by_prefix(room_missions_prefix(room_path), direct_children_only=True)
     if existing:
@@ -630,6 +670,67 @@ def _build_room_mission_specs(room_path: str, room_name: str, purpose: str, tags
             "reward_seeds": reward + 1,
             "tags": [tag for tag in tags if tag in {"troca", "conexão", "networking"}],
         })
+    return specs[:3]
+
+
+def _build_room_challenge_specs(room_path: str, room_name: str, purpose: str, tags: list[str], motifs: list[str]) -> list[dict]:
+    label = room_name.replace('🌱 ', '').replace('📝 ', '').strip() or room_path.replace('mudai.places.', '')
+    primary = motifs[0] if motifs else purpose or label
+    slug = room_slug(room_path)
+    specs = [
+        {
+            "title": f"Pulso de {label}",
+            "instruction": f"Deixe uma frase curta dizendo o que {label} desperta em você.",
+            "challenge_type": "reflexão",
+            "reward_seeds": 4,
+            "novelty_key": f"bootstrap-reflexao-{slug}",
+            "relevance_score": 0.72,
+            "generator_version": 0,
+            "prompt_fingerprint": f"bootstrap:{slug}:reflexao",
+        },
+        {
+            "title": f"Ecos de {label}",
+            "instruction": f"Responda em 1 frase a algo que esta sala está puxando agora: {primary}.",
+            "challenge_type": "perspectiva",
+            "reward_seeds": 4,
+            "novelty_key": f"bootstrap-ecos-{slug}-{hashlib.sha256(primary.encode()).hexdigest()[:6]}",
+            "relevance_score": 0.68,
+            "generator_version": 0,
+            "prompt_fingerprint": f"bootstrap:{slug}:ecos",
+        },
+        {
+            "title": f"Próximo gesto em {label}",
+            "instruction": f"Em 1 frase útil, diga algo que fortaleceria o propósito desta sala: {purpose or label}.",
+            "challenge_type": "insight",
+            "reward_seeds": 4,
+            "novelty_key": f"bootstrap-proposito-{slug}-{hashlib.sha256((purpose or label).encode()).hexdigest()[:6]}",
+            "relevance_score": 0.64,
+            "generator_version": 0,
+            "prompt_fingerprint": f"bootstrap:{slug}:proposito",
+        },
+    ]
+    if any(tag in tags for tag in ["poesia", "escrita"]):
+        specs[0] = {
+            "title": f"Verso vivo de {label}",
+            "instruction": f"Escreva 1 frase que poderia ficar gravada em {label} sem quebrar o clima da sala.",
+            "challenge_type": "história",
+            "reward_seeds": 4,
+            "novelty_key": f"bootstrap-poesia-{slug}",
+            "relevance_score": 0.74,
+            "generator_version": 0,
+            "prompt_fingerprint": f"bootstrap:{slug}:poesia",
+        }
+    elif any(tag in tags for tag in ["troca", "conexão", "conexao", "networking"]):
+        specs[0] = {
+            "title": f"Troca viva em {label}",
+            "instruction": f"Diga em 1 frase algo que você pode oferecer ou buscar aqui em {label}.",
+            "challenge_type": "troca",
+            "reward_seeds": 4,
+            "novelty_key": f"bootstrap-troca-{slug}",
+            "relevance_score": 0.74,
+            "generator_version": 0,
+            "prompt_fingerprint": f"bootstrap:{slug}:troca",
+        }
     return specs[:3]
 
 

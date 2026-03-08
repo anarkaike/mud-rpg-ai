@@ -11,6 +11,106 @@ import markdown
 from typing import Optional
 
 
+def _safe_text(value: object) -> str:
+    return html.escape(str(value or "").strip())
+
+
+def _room_label(room_path: str) -> str:
+    label = str(room_path or "").split(".")[-1].replace("_", " ").strip()
+    return label.title() or "Recepção"
+
+
+def _build_tab_navigation(path: str, active_tab: str) -> str:
+    session_token = path if len(path) == 16 else ""
+    if not session_token:
+        return ""
+    tabs = [
+        ("room", "Sala"),
+        ("challenges", "Desafios"),
+        ("social", "Rede"),
+        ("profile", "Perfil"),
+    ]
+    items = "".join(
+        f'<a class="tab-link{(" active" if key == active_tab else "")}" href="/p/{session_token}?tab={key}">{label}</a>'
+        for key, label in tabs
+    )
+    return f'<nav class="tab-nav">{items}</nav>'
+
+
+def _build_profile_sections(player_state: dict) -> tuple[str, str]:
+    structured = player_state.get("structured_profile", {}) if isinstance(player_state.get("structured_profile", {}), dict) else {}
+    summary = _safe_text(structured.get("summary", ""))
+    worlds = structured.get("worlds", []) if isinstance(structured.get("worlds", []), list) else []
+    strengths = structured.get("strengths", []) if isinstance(structured.get("strengths", []), list) else []
+    badges = player_state.get("badges", []) if isinstance(player_state.get("badges", []), list) else []
+    public_rows = [
+        ("Apelido", player_state.get("nickname", "Viajante")),
+        ("Essência", player_state.get("essence", "")),
+        ("Avatar", player_state.get("avatar", "")),
+        ("Resumo", summary),
+        ("Oferece", player_state.get("offers", "")),
+        ("Busca", player_state.get("seeks", "")),
+        ("Mundos", ", ".join(str(item) for item in worlds[:4])),
+        ("Forças", ", ".join(str(item) for item in strengths[:4])),
+        ("Badges", ", ".join(str(item) for item in badges[:6])),
+    ]
+    private_rows = [
+        ("Sala atual", _room_label(player_state.get("current_room", ""))),
+        ("Nível", player_state.get("level", 1)),
+        ("Sementes", player_state.get("seeds", 0)),
+        ("Sementes totais", player_state.get("total_seeds_earned", 0)),
+        ("Missões concluídas", player_state.get("completed_missions", 0)),
+        ("Desafios concluídos", player_state.get("completed_challenges", 0)),
+        ("Criado em", player_state.get("created_at", "")),
+    ]
+    def build_rows(rows: list[tuple[str, object]]) -> str:
+        items = []
+        for label, value in rows:
+            text = _safe_text(value)
+            if not text:
+                continue
+            items.append(
+                f'<div class="info-row"><div class="info-label">{_safe_text(label)}</div><div class="info-value">{text}</div></div>'
+            )
+        return "".join(items) or '<div class="empty-state">Nada para mostrar ainda.</div>'
+    return build_rows(public_rows), build_rows(private_rows)
+
+
+def _build_context_footer(path: str, player_state: Optional[dict], room_state: Optional[dict], active_tab: str, highlight_block_id: str) -> str:
+    session_token = path if len(path) == 16 else ""
+    room_path = ""
+    if player_state:
+        room_path = str(player_state.get("current_room", "") or "")
+    if not room_path and room_state:
+        state_meta = room_state.get("state", {}) if isinstance(room_state.get("state", {}), dict) else {}
+        room_path = str(state_meta.get("room_path", "") or "")
+    room_label = _room_label(room_path)
+    links = []
+    if session_token:
+        links.append(("Sala atual", f"/p/{session_token}?tab=room"))
+        links.append(("Desafios", f"/p/{session_token}?tab=challenges"))
+        links.append(("Perfil", f"/p/{session_token}?tab=profile"))
+        links.append(("Rede", f"/p/{session_token}?tab=social"))
+    elif room_path:
+        links.append(("Ver sala", f"/p/{room_path}"))
+    recent = []
+    if room_state:
+        state_meta = room_state.get("state", {}) if isinstance(room_state.get("state", {}), dict) else {}
+        recent = state_meta.get("recent_contributions", []) if isinstance(state_meta.get("recent_contributions", []), list) else []
+    focus_id = highlight_block_id or (recent[0].get("id", "") if recent else "")
+    if session_token and focus_id:
+        links.insert(0, (f"Abrir {room_label} no ponto atual", f"/p/{session_token}?tab=room&highlight={focus_id}"))
+    elif room_path and focus_id:
+        links.insert(0, (f"Abrir {room_label} no ponto atual", f"/p/{room_path}?highlight={focus_id}"))
+    link_html = "".join(
+        f'<a class="context-link{(" active" if f"tab={active_tab}" in href else "")}" href="{href}">{_safe_text(label)}</a>'
+        for label, href in links
+    )
+    if not link_html:
+        return ""
+    return f'<div class="context-footer"><div class="context-footer-title">Navegação contextual</div><div class="context-links">{link_html}</div></div>'
+
+
 def render_markdown_to_html(
     content: str,
     title: str = "MUD-AI",
@@ -20,6 +120,8 @@ def render_markdown_to_html(
     player_stats: Optional[dict] = None,
     player_state: Optional[dict] = None,
     players_here: Optional[list[dict]] = None,
+    active_tab: str = "room",
+    highlight_block_id: str = "",
 ) -> str:
     """Convert markdown content to HTML page or inner container content."""
     md = markdown.Markdown(
@@ -66,6 +168,9 @@ def render_markdown_to_html(
 
     mission_panel_html = ""
     challenge_panel_html = ""
+    room_overview_html = ""
+    social_panel_html = ""
+    profile_panel_html = ""
 
     # If we have room state, handle images, gallery and echoes
     if room_state:
@@ -103,11 +208,33 @@ def render_markdown_to_html(
             echoes_html = '<div class="room-echoes"><h3>🗣️ Ecos Recentes</h3><ul>'
             for contrib in recent_contributions[:5]:
                 excerpt = contrib.get("excerpt", "")
-                author = contrib.get("author_name", "Alguém")
+                author = contrib.get("author", contrib.get("author_name", "Alguém"))
+                item_id = str(contrib.get("id", "") or "")
+                item_class = " echo-highlight" if highlight_block_id and item_id == highlight_block_id else ""
                 if excerpt:
-                    echoes_html += f'<li><strong>{author}:</strong> <em>"{excerpt}"</em></li>'
+                    echoes_html += f'<li class="echo-item{item_class}" id="echo-{item_id}"><strong>{html.escape(str(author))}:</strong> <em>"{html.escape(str(excerpt))}"</em></li>'
             echoes_html += '</ul></div>'
             html_body += echoes_html
+
+        room_name = _safe_text(meta.get("room_name", title))
+        room_purpose = _safe_text(meta.get("purpose", ""))
+        room_motifs = meta.get("motifs", []) if isinstance(meta.get("motifs", []), list) else []
+        motif_badges = "".join(f'<span class="mini-badge">#{_safe_text(item)}</span>' for item in room_motifs[:5])
+        momentum = int(meta.get("momentum_score", 0) or 0)
+        social_heat = int(meta.get("social_heat", 0) or 0)
+        room_overview_html = f"""
+        <section class="dashboard-card room-overview">
+            <div class="section-kicker">Sala atual</div>
+            <div class="hero-title">{room_name}</div>
+            <div class="hero-subtitle">{room_purpose or 'Explore, observe e deixe um eco autoral nesta sala.'}</div>
+            <div class="stats-grid">
+                <div class="stat-card"><span class="stat-label">Jogadores</span><strong>{len(players_here or [])}</strong></div>
+                <div class="stat-card"><span class="stat-label">Momentum</span><strong>{momentum}</strong></div>
+                <div class="stat-card"><span class="stat-label">Calor social</span><strong>{social_heat}</strong></div>
+            </div>
+            <div class="badge-strip">{motif_badges or '<span class="empty-state-inline">Sem tags fortes ainda.</span>'}</div>
+        </section>
+        """
 
         # 4. Handle Missions
         missions = meta.get("missions", room_state.get("missions", []))
@@ -219,6 +346,22 @@ def render_markdown_to_html(
             </div>
             """
 
+        if player_state:
+            relationship_progress = player_state.get("relationship_progress", {}) if isinstance(player_state.get("relationship_progress", {}), dict) else {}
+            social_panel_html = f"""
+            <section class="dashboard-card social-panel">
+                <div class="section-kicker">Rede</div>
+                <div class="hero-title">Presença social</div>
+                <div class="info-grid compact">
+                    <div class="info-row"><div class="info-label">Presentes agora</div><div class="info-value">{len(players_here or [])}</div></div>
+                    <div class="info-row"><div class="info-label">Favoritos</div><div class="info-value">{_safe_text(relationship_progress.get('favorites', 0))}</div></div>
+                    <div class="info-row"><div class="info-label">Mútuos</div><div class="info-value">{_safe_text(relationship_progress.get('mutuals', 0))}</div></div>
+                    <div class="info-row"><div class="info-label">Com nota privada</div><div class="info-value">{_safe_text(relationship_progress.get('noted', 0))}</div></div>
+                </div>
+                <div class="support-copy">Veja quem está com você na sala e use as pistas do mundo para puxar conversa sem expor dados sensíveis.</div>
+            </section>
+            """
+
         # 5. Handle Game Log / System Messages
         game_log = meta.get("game_log", [])
         if game_log:
@@ -233,6 +376,30 @@ def render_markdown_to_html(
             </div>
             """
             html_body += log_html
+
+    if player_state:
+        public_html, private_html = _build_profile_sections(player_state)
+        active_room = _safe_text(_room_label(player_state.get("current_room", "")))
+        active_challenge = player_state.get("active_challenge") or {}
+        active_challenge_title = _safe_text(active_challenge.get("title", "Sem desafio ativo"))
+        profile_panel_html = f"""
+        <section class="dashboard-card profile-panel">
+            <div class="section-kicker">Perfil</div>
+            <div class="hero-title">{_safe_text(player_state.get('nickname', 'Viajante'))}</div>
+            <div class="hero-subtitle">Só informações públicas aparecem fora do seu painel. Telefone nunca é exibido.</div>
+            <div class="profile-split">
+                <div class="info-panel">
+                    <div class="panel-title">Informações públicas</div>
+                    <div class="info-grid">{public_html}</div>
+                </div>
+                <div class="info-panel private">
+                    <div class="panel-title">Informações privadas</div>
+                    <div class="info-grid">{private_html}</div>
+                    <div class="support-copy">Você está em <strong>{active_room}</strong>. Desafio atual: <strong>{active_challenge_title}</strong>.</div>
+                </div>
+            </div>
+        </section>
+        """
 
     # Try to extract title from frontmatter or first heading
     if hasattr(md, "Meta") and "title" in md.Meta:
@@ -302,6 +469,18 @@ def render_markdown_to_html(
             </div>
             """
             
+        tab_nav_html = _build_tab_navigation(path, active_tab)
+        contextual_footer_html = _build_context_footer(path, player_state, room_state, active_tab, highlight_block_id)
+        active_section_html = html_body
+        if player_state:
+            if active_tab == "profile":
+                active_section_html = profile_panel_html or html_body
+            elif active_tab == "challenges":
+                active_section_html = (challenge_panel_html or "") + (mission_panel_html or "") + html_body
+            elif active_tab == "social":
+                active_section_html = (social_panel_html or "") + html_body
+            else:
+                active_section_html = (room_overview_html or "") + (mission_panel_html or "") + (challenge_panel_html or "") + html_body
         return f"""
         {player_bar_oob}
         {players_sidebar_oob}
@@ -310,13 +489,45 @@ def render_markdown_to_html(
         <div class="breadcrumb">
             {_path_to_breadcrumb(path)}
         </div>
-        {html_body}
+        {tab_nav_html}
+        <div class="dashboard-main">{active_section_html}</div>
+        {contextual_footer_html}
         """
 
-    return _wrap_in_template(html_body, title, path, player_stats=player_stats, players_here=players_here, mission_panel_html=mission_panel_html, challenge_panel_html=challenge_panel_html)
+    return _wrap_in_template(
+        html_body,
+        title,
+        path,
+        player_stats=player_stats,
+        players_here=players_here,
+        mission_panel_html=mission_panel_html,
+        challenge_panel_html=challenge_panel_html,
+        player_state=player_state,
+        room_state=room_state,
+        active_tab=active_tab,
+        highlight_block_id=highlight_block_id,
+        room_overview_html=room_overview_html,
+        social_panel_html=social_panel_html,
+        profile_panel_html=profile_panel_html,
+    )
 
 
-def _wrap_in_template(body_html: str, title: str, path: str, player_stats: Optional[dict] = None, players_here: Optional[list[dict]] = None, mission_panel_html: str = "", challenge_panel_html: str = "") -> str:
+def _wrap_in_template(
+    body_html: str,
+    title: str,
+    path: str,
+    player_stats: Optional[dict] = None,
+    players_here: Optional[list[dict]] = None,
+    mission_panel_html: str = "",
+    challenge_panel_html: str = "",
+    player_state: Optional[dict] = None,
+    room_state: Optional[dict] = None,
+    active_tab: str = "room",
+    highlight_block_id: str = "",
+    room_overview_html: str = "",
+    social_panel_html: str = "",
+    profile_panel_html: str = "",
+) -> str:
     """Wrap HTML body in a premium dark-themed page with glassmorphism."""
     # Check if we have a session token (16-char path)
     session_token = path if len(path) == 16 else None
@@ -370,6 +581,17 @@ def _wrap_in_template(body_html: str, title: str, path: str, player_stats: Optio
         """
 
     mission_sidebar_html = mission_panel_html + challenge_panel_html
+    tab_nav_html = _build_tab_navigation(path, active_tab)
+    contextual_footer_html = _build_context_footer(path, player_state, room_state, active_tab, highlight_block_id)
+    if player_state:
+        if active_tab == "profile":
+            body_html = profile_panel_html or body_html
+        elif active_tab == "challenges":
+            body_html = (challenge_panel_html or "") + (mission_panel_html or "") + body_html
+        elif active_tab == "social":
+            body_html = (social_panel_html or "") + body_html
+        else:
+            body_html = (room_overview_html or "") + mission_sidebar_html + body_html
 
     terminal_html = ""
     polling_attrs = ""
@@ -562,6 +784,223 @@ def _wrap_in_template(body_html: str, title: str, path: str, player_stats: Optio
             font-weight: 500;
         }}
 
+        .echo-item.echo-highlight {{
+            background: rgba(56, 189, 248, 0.12);
+            border: 1px solid rgba(56, 189, 248, 0.25);
+            border-radius: 10px;
+            padding: 0.75rem;
+        }}
+
+        .tab-nav {{
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }}
+
+        .tab-link {{
+            text-align: center;
+            padding: 0.8rem 0.5rem;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: rgba(15, 23, 42, 0.35);
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            font-weight: 600;
+        }}
+
+        .tab-link.active {{
+            background: var(--accent-gradient);
+            color: #fff;
+            border-color: transparent;
+        }}
+
+        .dashboard-main {{
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }}
+
+        .dashboard-card {{
+            padding: 1rem;
+            background: rgba(15, 23, 42, 0.34);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+        }}
+
+        .section-kicker {{
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }}
+
+        .hero-title {{
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }}
+
+        .hero-subtitle {{
+            margin-top: 0.35rem;
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }}
+
+        .stats-grid {{
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }}
+
+        .stat-card {{
+            padding: 0.85rem;
+            border-radius: 12px;
+            background: rgba(2, 6, 23, 0.45);
+            border: 1px solid var(--border);
+        }}
+
+        .stat-card strong {{
+            display: block;
+            margin-top: 0.35rem;
+            font-size: 1.15rem;
+            color: var(--text-primary);
+        }}
+
+        .stat-label {{
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }}
+
+        .badge-strip {{
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }}
+
+        .mini-badge {{
+            display: inline-flex;
+            align-items: center;
+            padding: 0.35rem 0.65rem;
+            border-radius: 999px;
+            background: rgba(56, 189, 248, 0.12);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            color: var(--accent);
+            font-size: 0.8rem;
+        }}
+
+        .empty-state-inline, .empty-state {{
+            color: var(--text-muted);
+            font-style: italic;
+        }}
+
+        .profile-split {{
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1rem;
+            margin-top: 1rem;
+        }}
+
+        .info-panel {{
+            padding: 1rem;
+            border-radius: 14px;
+            background: rgba(2, 6, 23, 0.45);
+            border: 1px solid var(--border);
+        }}
+
+        .info-panel.private {{
+            border-color: rgba(129, 140, 248, 0.28);
+        }}
+
+        .panel-title {{
+            font-size: 0.82rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            margin-bottom: 0.85rem;
+        }}
+
+        .info-grid {{
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }}
+
+        .info-grid.compact {{
+            gap: 0.5rem;
+        }}
+
+        .info-row {{
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+            padding-bottom: 0.65rem;
+            border-bottom: 1px solid rgba(51, 65, 85, 0.35);
+        }}
+
+        .info-label {{
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }}
+
+        .info-value {{
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            word-break: break-word;
+        }}
+
+        .support-copy {{
+            margin-top: 0.85rem;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }}
+
+        .context-footer {{
+            margin-top: 1rem;
+            padding: 1rem;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            background: rgba(15, 23, 42, 0.24);
+        }}
+
+        .context-footer-title {{
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+        }}
+
+        .context-links {{
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }}
+
+        .context-link {{
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.65rem 0.85rem;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: rgba(2, 6, 23, 0.45);
+            color: var(--text-primary);
+            font-size: 0.85rem;
+        }}
+
+        .context-link.active {{
+            border-color: rgba(56, 189, 248, 0.35);
+            color: var(--accent);
+        }}
+
         /* Player Stats Bar */
         .player-stats-bar {{
             position: fixed;
@@ -669,16 +1108,15 @@ def _wrap_in_template(body_html: str, title: str, path: str, player_stats: Optio
 
         /* Presence Sidebar */
         .presence-sidebar {{
-            position: fixed;
-            top: 100px;
-            right: 2rem;
-            width: 180px;
+            position: static;
+            width: 100%;
             background: var(--bg-card);
             backdrop-filter: blur(10px);
             border: 1px solid var(--border);
             border-radius: var(--radius-md);
             padding: 1rem;
             z-index: 100;
+            margin-bottom: 1rem;
         }}
 
         .presence-header {{
@@ -1149,7 +1587,7 @@ def _wrap_in_template(body_html: str, title: str, path: str, player_stats: Optio
 
         .footer {{
             margin-top: auto;
-            padding: 3rem 0;
+            padding: 1.5rem 0 8rem;
             text-align: center;
             color: var(--text-muted);
             font-size: 0.9rem;
@@ -1162,20 +1600,36 @@ def _wrap_in_template(body_html: str, title: str, path: str, player_stats: Optio
         }}
 
         @media (max-width: 640px) {{
-            .container {{ margin: 1rem; padding: 1.5rem; }}
+            .container {{ margin: 0.75rem; padding: 1rem; }}
             h1 {{ font-size: 2rem; }}
+            .player-stats-bar {{ padding: 0.65rem 1rem; flex-direction: column; gap: 0.35rem; align-items: flex-start; }}
+            .player-info {{ gap: 0.75rem; flex-wrap: wrap; }}
+            .terminal-container {{ padding: 0.85rem 0.85rem calc(0.85rem + env(safe-area-inset-bottom)); }}
+            .terminal-form {{ flex-direction: column; gap: 0.75rem; }}
+            .terminal-button {{ padding: 0.9rem 1rem; }}
+            .stats-grid {{ grid-template-columns: 1fr; }}
+            .mission-card-header {{ flex-direction: column; align-items: flex-start; }}
+        }}
+
+        @media (min-width: 900px) {{
+            .container {{ max-width: 980px; }}
+            .profile-split {{ grid-template-columns: 1fr 1fr; }}
+            .presence-sidebar {{ position: sticky; top: 84px; }}
         }}
     </style>
 </head>
 <body>
     {player_bar_html}
-    {presence_sidebar_html}
     <div class="container" {polling_attrs}>
         <div class="breadcrumb">
             {_path_to_breadcrumb(path)}
         </div>
-        {mission_sidebar_html}
-        {body_html}
+        {tab_nav_html}
+        {presence_sidebar_html}
+        <div class="dashboard-main">
+            {body_html}
+        </div>
+        {contextual_footer_html}
     </div>
     {terminal_html}
     <div class="footer">

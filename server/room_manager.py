@@ -113,6 +113,13 @@ def get_room_info(room_path: str) -> Optional[dict]:
         purpose=meta.get("purpose", ""),
         tags=meta.get("tags", []),
     )
+    world_state.ensure_room_challenges(
+        room_path,
+        room_name=_extract_room_name(content),
+        purpose=meta.get("purpose", ""),
+        tags=meta.get("tags", []),
+        motifs=state.get("metadata_parsed", {}).get("motifs", []),
+    )
     snapshot = world_state.room_dynamic_snapshot(room_path)
     state_meta = snapshot.get("state", state.get("metadata_parsed", {}))
 
