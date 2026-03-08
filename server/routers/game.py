@@ -182,6 +182,7 @@ async def get_player_state(phone: str):
     return {
         "phone": phone,
         "player": player,
+        "active_challenge": meta.get("active_challenge"),
         "current_room": room_info,
         "current_room_state": world_state.get_room_state(current_room_path) if current_room_path else None,
         "current_room_blocks": world_state.list_room_blocks(current_room_path, limit=8) if current_room_path else [],

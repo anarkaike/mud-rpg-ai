@@ -11,6 +11,8 @@ from fastapi.responses import HTMLResponse
 
 from .. import database as db
 from ..renderer import render_markdown_to_html
+from .. import world_state
+from .. import room_manager
 
 
 router = APIRouter(tags=["pages"])
@@ -66,27 +68,8 @@ def _find_user_by_token(token: str):
     return None
 
 
-@router.get("/p/{path:path}", response_class=HTMLResponse)
-async def render_page(path: str):
-    """
-    Render an artifact as a public HTML page.
-    Supports both direct dot-paths and 16-char hashed profile tokens.
-    """
-    if not path or path.strip() == "":
-        return HTMLResponse(content=_build_index_html())
-
-    # 1. Try direct path first
-    artifact = db.get_artifact(path)
-
-    # 2. If not found and path looks like a 16-char token, search for user
-    if artifact is None and len(path) == 16:
-        artifact = _find_user_by_token(path)
-        if artifact:
-            path = artifact["path"]
-
-    if artifact is None:
-        raise HTTPException(status_code=404, detail=f"Page not found: {path}")
-
+def _render_artifact_to_html_inner(artifact: dict, path: str) -> str:
+    """Helper to render an artifact to HTML (inner container only)."""
     # Extract a nice title
     title = path.split(".")[-1].replace("-", " ").title()
     meta = artifact.get("metadata_parsed", {})
@@ -114,9 +97,109 @@ async def render_page(path: str):
         
         content = re.sub(r'\{([a-zA-Z0-9_]+)\}', replace_var, content)
 
-    html = render_markdown_to_html(
+    # Fetch room state if this is a room
+    room_state = None
+    if path.startswith("mudai.places."):
+        # Use snapshot to get state + current image
+        room_state = world_state.room_dynamic_snapshot(path)
+
+    # Fetch player stats if session token is provided
+    player_stats = None
+    if len(path) == 16:
+        artifact = _find_user_by_token(path)
+        if artifact:
+            meta = artifact.get("metadata_parsed", {})
+            player_stats = {
+                "nickname": meta.get("nickname", "Viajante"),
+                "seeds": meta.get("seeds", 0),
+                "level": meta.get("level", 1),
+            }
+
+    # Fetch players here if this is a room
+    players_here = None
+    if path.startswith("mudai.places."):
+        players_here = room_manager.get_players_in_room(path)
+
+    return render_markdown_to_html(
         content=content,
         title=title,
         path=path,
+        full_page=False,
+        room_state=room_state,
+        player_stats=player_stats,
+        players_here=players_here,
     )
-    return HTMLResponse(content=html)
+
+
+@router.get("/p/{path:path}", response_class=HTMLResponse)
+async def render_page(path: str):
+    """
+    Render an artifact as a public HTML page.
+    Supports both direct dot-paths and 16-char hashed profile tokens.
+    """
+    if not path or path.strip() == "":
+        return HTMLResponse(content=_build_index_html())
+
+    # 1. Try direct path first
+    artifact = db.get_artifact(path)
+    original_path = path
+
+    # 2. If not found and path looks like a 16-char token, search for user
+    if artifact is None and len(path) == 16:
+        artifact = _find_user_by_token(path)
+        if artifact:
+            path = artifact["path"]
+
+    if artifact is None:
+        raise HTTPException(status_code=404, detail=f"Page not found: {path}")
+
+    # Fetch room state if this is a room
+    room_state = None
+    if path.startswith("mudai.places."):
+        room_state = world_state.room_dynamic_snapshot(path)
+
+    # Fetch player stats if session token is provided
+    player_stats = None
+    if len(original_path) == 16:
+        user_artifact = _find_user_by_token(original_path)
+        if user_artifact:
+            u_meta = user_artifact.get("metadata_parsed", {})
+            player_stats = {
+                "nickname": u_meta.get("nickname", "Viajante"),
+                "seeds": u_meta.get("seeds", 0),
+                "level": u_meta.get("level", 1),
+            }
+
+    # For full pages, we want the outer wrapper too
+    # Extract title from meta for the wrapper
+    title = path.split(".")[-1].replace("-", " ").title()
+    if artifact.get("metadata_parsed", {}).get("nickname"):
+        title = artifact["metadata_parsed"]["nickname"]
+        
+    # Re-render to get the full page with the correct path (original token if provided)
+    meta = artifact.get("metadata_parsed", {})
+    content = artifact["content"]
+    if path.startswith("mudai.users."):
+        import re
+        def replace_var(match):
+            key = match.group(1)
+            key_map = {"habilidades_ofereco": "offers", "habilidades_busco": "seeks", "tracos": "essence", "avatar_textual": "avatar"}
+            val = meta.get(key_map.get(key, key))
+            return str(val) if val else "_ainda não descoberto_"
+        content = re.sub(r'\{([a-zA-Z0-9_]+)\}', replace_var, content)
+
+    # Fetch players here if this is a room
+    players_here = None
+    if path.startswith("mudai.places."):
+        players_here = room_manager.get_players_in_room(path)
+
+    full_html = render_markdown_to_html(
+        content=content,
+        title=title,
+        path=original_path, # Use original token path to show terminal
+        full_page=True,
+        room_state=room_state,
+        player_stats=player_stats,
+        players_here=players_here,
+    )
+    return HTMLResponse(content=full_html)

@@ -79,7 +79,7 @@ def format_room_view(
         parts.append(f"\n🗺 {breadcrumb}")
 
     if profile_url:
-        parts.append(f"🔗 {profile_url}")
+        parts.append(f"\n🌐 *Live Dashboard (Jogue via Web):*\n{profile_url}")
 
     parts.append(SEP)
     return "\n".join(p for p in parts if p is not None)
@@ -131,7 +131,7 @@ def format_interaction(
         parts.append(f"\n🗺 {breadcrumb}")
 
     if profile_url:
-        parts.append(f"🔗 {profile_url}")
+        parts.append(f"\n🌐 *Live Dashboard (Jogue via Web):*\n{profile_url}")
 
     parts.append(SEP)
     return "\n".join(p for p in parts if p is not None)

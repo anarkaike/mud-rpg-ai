@@ -1,6 +1,6 @@
 # AI Instructions - mud-ai
 # Gerado automaticamente pelo AI-DOC Kernel v2.0
-# Data: 2026-03-08T07:56:04.839Z
+# Data: 2026-03-08T08:00:26.199Z
 # Variante: FULL
 # ⚠️ NÃO EDITE MANUALMENTE - Use 'ai-doc build' para regenerar
 

@@ -307,6 +307,23 @@ def _calculate_relevance(player_interests: list[str], room_tags: list[str]) -> i
     return len(overlap) * 3 + 1
 
 
+def get_players_in_room(room_path: str) -> list[dict]:
+    """
+    Get a list of player names/nicknames in a room.
+    """
+    players = db.list_by_prefix("mudai.users.", direct_children_only=True)
+    in_room = []
+    for p in players:
+        meta = p.get("metadata_parsed", {})
+        if meta.get("current_room") == room_path:
+            in_room.append({
+                "nickname": meta.get("nickname", "Viajante"),
+                "level": meta.get("level", 1),
+                "avatar": meta.get("avatar", ""),
+            })
+    return in_room
+
+
 def _count_players_in_room(room_path: str) -> int:
     """Count players in a room."""
     players = db.list_by_prefix("mudai.users.", direct_children_only=True)

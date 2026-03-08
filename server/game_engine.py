@@ -111,6 +111,7 @@ SEEDS_REWARDS = {
     "visit_new_room": 2,
     "decorate": 1,
     "chat": 1,
+    "challenge": 3,
     "onboarding_complete": 3,
     "referral": 5,
     "first_look": 1,
@@ -315,7 +316,7 @@ async def _handle_move(phone: str, meta: dict, target: str) -> str:
 
     seeds = meta.get("seeds", 0) + seeds_change
 
-    return fmt.format_room_view(
+    response = fmt.format_room_view(
         room_name=room_info["name"],
         room_subtitle=room_info.get("subtitle", room_info.get("purpose", "")),
         seeds=seeds,
@@ -329,6 +330,7 @@ async def _handle_move(phone: str, meta: dict, target: str) -> str:
         badge=new_badge,
         profile_url=_generate_profile_url(phone),
     )
+    return _attach_room_challenge(phone, meta, room_info, response, trigger="move")
 
 
 async def _handle_look(phone: str, meta: dict) -> str:
@@ -349,7 +351,7 @@ async def _handle_look(phone: str, meta: dict) -> str:
     if room_dynamic:
         narrative = f"{narrative} {room_dynamic}".strip()
 
-    return fmt.format_room_view(
+    response = fmt.format_room_view(
         room_name=room_info["name"],
         room_subtitle=room_info.get("subtitle", room_info.get("purpose", "")),
         seeds=meta.get("seeds", 0),
@@ -361,6 +363,7 @@ async def _handle_look(phone: str, meta: dict) -> str:
         breadcrumb=room_info["name"].replace("🌱 ", "").replace("📝 ", ""),
         profile_url=_generate_profile_url(phone),
     )
+    return _attach_room_challenge(phone, meta, room_info, response, trigger="look")
 
 
 def _handle_profile(phone: str, meta: dict) -> str:
@@ -591,6 +594,12 @@ def _handle_referral(phone: str, target_phone: str) -> str:
 
 async def _handle_chat(phone: str, meta: dict, message: str) -> str:
     """Handle general chat/conversation with AI context."""
+    active_challenge = meta.get("active_challenge")
+    if active_challenge:
+        resolution = _resolve_active_challenge(phone, meta, message, active_challenge)
+        if resolution:
+            return resolution
+
     current_room = meta.get("current_room", "mudai.places.start")
     room_info = rooms.get_room_info(current_room)
     nickname = meta.get("nickname", "Aventureiro")
@@ -781,6 +790,141 @@ def _generate_profile_url(phone: str) -> str:
     clean = _clean_phone(phone)
     token = hashlib.sha256(f"mudai-{clean}-2026".encode()).hexdigest()[:16]
     return f"{base_url}/p/{token}"
+
+
+def _attach_room_challenge(phone: str, meta: dict, room_info: dict | None, response: str, trigger: str) -> str:
+    if not room_info:
+        return response
+    challenge = _ensure_active_challenge(phone, meta, room_info, trigger=trigger)
+    if not challenge:
+        return response
+    challenge_text = fmt.format_challenge(
+        challenge_type=challenge["type"],
+        instruction=challenge["instruction"],
+        reward_seeds=challenge["reward_seeds"],
+    )
+    return f"{response}\n\n{challenge_text}"
+
+
+def _ensure_active_challenge(phone: str, meta: dict, room_info: dict, trigger: str) -> dict | None:
+    current_room = room_info.get("path")
+    active = meta.get("active_challenge")
+    if active and active.get("status") == "active" and active.get("room_path") == current_room:
+        return active
+    if trigger == "move" and active and active.get("status") == "active":
+        return None
+    challenge = _build_room_challenge(room_info)
+    if not challenge:
+        return None
+    _update_meta(phone, {
+        "active_challenge": challenge,
+        "last_challenge_room": current_room,
+    })
+    return challenge
+
+
+def _build_room_challenge(room_info: dict) -> dict | None:
+    room_path = room_info.get("path", "")
+    room_name = room_info.get("name", "Sala")
+    motifs = room_info.get("motifs", [])[:3]
+    highlights = room_info.get("recent_contributions", [])[:2]
+    purpose = room_info.get("purpose", "")
+    tags = room_info.get("tags", [])
+    challenge_type = "reflexão"
+    instruction = "Deixe uma frase curta dizendo o que este lugar desperta em você."
+
+    if any(tag in tags for tag in ["poesia", "escrita"]):
+        challenge_type = "história"
+        instruction = f"Escreva 1 frase que poderia ficar gravada em {room_name} sem quebrar o clima da sala."
+    elif any(tag in tags for tag in ["troca", "conexão", "networking"]):
+        challenge_type = "troca"
+        instruction = f"Diga em 1 frase algo que você pode oferecer ou buscar aqui em {room_name}."
+    elif motifs:
+        challenge_type = "perspectiva"
+        instruction = f"Escolha um dos temas desta sala ({', '.join(motifs)}) e responda com uma visão sua em 1 ou 2 frases."
+    elif purpose:
+        challenge_type = "reflexão"
+        instruction = f"Em 1 frase, contribua com o propósito desta sala: {purpose}."
+    elif highlights:
+        excerpt = highlights[0].get("excerpt", "")
+        if excerpt:
+            challenge_type = "perspectiva"
+            instruction = f"Responda ao eco recente da sala com 1 frase nova: \"{excerpt}\""
+
+    challenge_id = hashlib.sha256(f"{room_path}:{instruction}".encode()).hexdigest()[:12]
+    return {
+        "id": challenge_id,
+        "room_path": room_path,
+        "room_name": room_name,
+        "type": challenge_type,
+        "instruction": instruction,
+        "reward_seeds": SEEDS_REWARDS["challenge"],
+        "status": "active",
+    }
+
+
+def _resolve_active_challenge(phone: str, meta: dict, message: str, challenge: dict) -> str | None:
+    text = message.strip()
+    normalized = text.lower()
+    if not text:
+        return None
+    if normalized in {"pular", "skip"}:
+        _update_meta(phone, {"active_challenge": None})
+        room_info = rooms.get_room_info(challenge.get("room_path", meta.get("current_room", "mudai.places.start")))
+        return fmt.format_interaction(
+            room_name=challenge.get("room_name", room_info["name"] if room_info else "Sala"),
+            action_label="Desafio ignorado",
+            seeds=meta.get("seeds", 0),
+            seeds_change=0,
+            level=_calculate_level(meta),
+            narrative="Tudo bem. Você pode continuar explorando e pegar outro desafio mais tarde.",
+            badge=None,
+            suggestions=_get_room_suggestions(room_info) if room_info else [{"cmd": "olhar", "desc": "ver detalhes"}],
+            breadcrumb=(challenge.get("room_name", "Sala")).replace("🌱 ", ""),
+            profile_url=_generate_profile_url(phone),
+        )
+    if len(text) < 6:
+        return fmt.format_challenge(
+            challenge_type=challenge.get("type", "desafio"),
+            instruction=f"Sua resposta ainda ficou curta. {challenge.get('instruction', '')}",
+            reward_seeds=challenge.get("reward_seeds", SEEDS_REWARDS["challenge"]),
+        )
+
+    room_path = challenge.get("room_path", meta.get("current_room", "mudai.places.start"))
+    room_info = rooms.get_room_info(room_path)
+    block = world_state.record_room_block(
+        room_path=room_path,
+        author_name=meta.get("nickname", "Aventureiro"),
+        author_phone=phone,
+        content=text,
+        block_type="challenge_response",
+    )
+    seeds_change = challenge.get("reward_seeds", SEEDS_REWARDS["challenge"])
+    new_seeds = meta.get("seeds", 0) + seeds_change
+    completed = int(meta.get("completed_challenges", 0)) + 1
+    _update_meta(phone, {
+        "seeds": new_seeds,
+        "total_seeds_earned": meta.get("total_seeds_earned", 0) + seeds_change,
+        "completed_challenges": completed,
+        "active_challenge": None,
+        "last_completed_challenge_id": challenge.get("id", ""),
+    })
+    narrative = (
+        f"Você concluiu o desafio de {challenge.get('type', 'exploração')} e deixou um novo eco na sala. "
+        f"Impacto narrativo: {block.get('metadata_parsed', {}).get('impact_score', 1)}."
+    )
+    return fmt.format_interaction(
+        room_name=challenge.get("room_name", room_info["name"] if room_info else "Sala"),
+        action_label="Desafio concluído",
+        seeds=new_seeds,
+        seeds_change=seeds_change,
+        level=_calculate_level({**meta, "total_seeds_earned": meta.get("total_seeds_earned", 0) + seeds_change}),
+        narrative=narrative,
+        badge=None,
+        suggestions=_get_room_suggestions(room_info) if room_info else [{"cmd": "olhar", "desc": "ver detalhes"}],
+        breadcrumb=(challenge.get("room_name", "Sala")).replace("🌱 ", ""),
+        profile_url=_generate_profile_url(phone),
+    )
 
 
 # ─── Helpers ──────────────────────────────────────────
