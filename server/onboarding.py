@@ -497,6 +497,34 @@ def _compact_profile_items(values: list[str], limit: int) -> list[str]:
     return items[:limit]
 
 
+def _normalize_profile_text(value, fallback: str = "", limit: int = 220) -> str:
+    if isinstance(value, list):
+        value = ", ".join(str(item).strip() for item in value if str(item).strip())
+    text = str(value or fallback).strip()
+    return text[:limit]
+
+
+def _normalize_profile_list(value, fallback: list[str], limit: int) -> list[str]:
+    if isinstance(value, list):
+        return _compact_profile_items([str(item) for item in value], limit=limit)
+    if isinstance(value, str):
+        return _compact_profile_items([value], limit=limit)
+    return list(fallback)[:limit]
+
+
+def _sanitize_structured_profile(result: dict, fallback: dict) -> dict:
+    safe_result = result if isinstance(result, dict) else {}
+    return {
+        "summary": _normalize_profile_text(safe_result.get("summary"), fallback=fallback["summary"], limit=220),
+        "current_moment": _normalize_profile_list(safe_result.get("current_moment"), fallback=fallback["current_moment"], limit=3),
+        "relationship_style": _normalize_profile_list(safe_result.get("relationship_style"), fallback=fallback["relationship_style"], limit=3),
+        "worlds": _normalize_profile_list(safe_result.get("worlds"), fallback=fallback["worlds"], limit=4),
+        "strengths": _normalize_profile_list(safe_result.get("strengths"), fallback=fallback["strengths"], limit=4),
+        "vocation_vector": _normalize_profile_text(safe_result.get("vocation_vector"), fallback=fallback["vocation_vector"], limit=220),
+        "communication_style": _normalize_profile_list(safe_result.get("communication_style"), fallback=fallback["communication_style"], limit=3),
+    }
+
+
 async def _extract_structured_profile(meta: dict) -> dict:
     fallback = _build_structured_profile_fallback(meta)
     answers = meta.get("onboarding_answers", {}) if isinstance(meta.get("onboarding_answers", {}), dict) else {}
@@ -515,15 +543,7 @@ async def _extract_structured_profile(meta: dict) -> dict:
             temperature=0.2,
             max_tokens=300,
         )
-        return {
-            "summary": str(result.get("summary", fallback["summary"]))[:220],
-            "current_moment": result.get("current_moment", fallback["current_moment"])[:3],
-            "relationship_style": result.get("relationship_style", fallback["relationship_style"])[:3],
-            "worlds": result.get("worlds", fallback["worlds"])[:4],
-            "strengths": result.get("strengths", fallback["strengths"])[:4],
-            "vocation_vector": str(result.get("vocation_vector", fallback["vocation_vector"]))[:220],
-            "communication_style": result.get("communication_style", fallback["communication_style"])[:3],
-        }
+        return _sanitize_structured_profile(result, fallback)
     except Exception as e:
         print(f"⚠️ Structured profile extraction failed: {e}")
         return fallback

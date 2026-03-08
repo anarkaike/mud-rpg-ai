@@ -32,6 +32,7 @@ def get_rooms_for_player(phone: str) -> list[dict]:
     player_level = meta.get("level", 1)
     player_interests = meta.get("interests", [])
     player_signals = meta.get("profile_signals", {})
+    player_structured_profile = meta.get("structured_profile", {})
     opted_in_adult = meta.get("opted_in_adult", False)
 
     # Get all place artifacts
@@ -74,6 +75,7 @@ def get_rooms_for_player(phone: str) -> list[dict]:
             player_interests,
             tags,
             player_signals=player_signals,
+            player_structured_profile=player_structured_profile,
             room_purpose=room_meta.get("purpose", ""),
         )
 
@@ -670,13 +672,7 @@ def _score_profile_signal_complementarity(player_signals: dict, other_signals: d
 
 
 def _tokenize_match_text(text: str) -> set[str]:
-    normalized = (text or "").lower()
-    normalized = normalized.replace("ç", "c")
-    normalized = normalized.replace("á", "a").replace("à", "a").replace("ã", "a").replace("â", "a")
-    normalized = normalized.replace("é", "e").replace("ê", "e")
-    normalized = normalized.replace("í", "i")
-    normalized = normalized.replace("ó", "o").replace("ô", "o").replace("õ", "o")
-    normalized = normalized.replace("ú", "u")
+    normalized = _normalize_match_text(text)
     tokens = re.split(r"[^a-z0-9]+", normalized)
     stopwords = {
         "de", "da", "do", "das", "dos", "e", "ou", "com", "para", "por", "em", "na", "no",
@@ -684,6 +680,17 @@ def _tokenize_match_text(text: str) -> set[str]:
         "ofereço", "procuro", "ajuda", "apoio", "troca", "conexao", "conexao", "gente", "pessoas",
     }
     return {token for token in tokens if len(token) >= 3 and token not in stopwords}
+
+
+def _normalize_match_text(text: str) -> str:
+    normalized = (text or "").lower()
+    normalized = normalized.replace("ç", "c")
+    normalized = normalized.replace("á", "a").replace("à", "a").replace("ã", "a").replace("â", "a")
+    normalized = normalized.replace("é", "e").replace("ê", "e")
+    normalized = normalized.replace("í", "i")
+    normalized = normalized.replace("ó", "o").replace("ô", "o").replace("õ", "o")
+    normalized = normalized.replace("ú", "u")
+    return normalized
 
 
 def _normalize_direction(direction: str) -> str:
@@ -810,6 +817,7 @@ def _calculate_relevance(
     player_interests: list[str],
     room_tags: list[str],
     player_signals: dict | None = None,
+    player_structured_profile: dict | None = None,
     room_purpose: str = "",
 ) -> int:
     """Score how relevant a room is to a player."""
@@ -825,6 +833,11 @@ def _calculate_relevance(
         room_purpose,
     )
     score += signal_bonus
+    score += _score_room_structured_profile_affinity(
+        player_structured_profile or {},
+        room_tags,
+        room_purpose,
+    )
     return score
 
 
@@ -872,6 +885,31 @@ def _score_room_signal_affinity(player_signals: dict, room_tags: list[str], room
             elif strength >= 0.4:
                 bonus += 1
     return bonus
+
+
+def _score_room_structured_profile_affinity(player_structured_profile: dict, room_tags: list[str], room_purpose: str = "") -> int:
+    if not player_structured_profile:
+        return 0
+
+    room_text = _normalize_match_text(" ".join(room_tags + [room_purpose]))
+    profile_terms = []
+    for key in ["current_moment", "worlds", "strengths"]:
+        value = player_structured_profile.get(key, [])
+        if isinstance(value, list):
+            profile_terms.extend(str(item) for item in value if item)
+        elif value:
+            profile_terms.append(str(value))
+
+    bonus = 0
+    for term in profile_terms[:8]:
+        normalized_term = _normalize_match_text(term)
+        if not normalized_term:
+            continue
+        tokens = [token for token in normalized_term.split() if len(token) >= 4]
+        if any(token in room_text for token in tokens[:3]):
+            bonus += 1
+
+    return min(bonus, 2)
 
 
 def get_players_in_room(room_path: str) -> list[dict]:

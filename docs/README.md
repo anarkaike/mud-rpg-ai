@@ -41,6 +41,38 @@ Na implementação atual, o produto já combina:
 6. **Camada de Mundo Vivo:** Salas podem manter `evolving_summary`, `visual_summary`, `motifs`, ecos recentes e preparação de assets visuais a partir das contribuições dos jogadores.
 7. **n8n como Relay Deliberadamente Fino:** O workflow ativo apenas recebe o webhook do Chatwoot, chama `/api/v1/game/action` e devolve a resposta, deixando a inteligência e a evolução de estado no backend.
 
+## 🌐 Interface Web & Landing
+
+O backend FastAPI também serve uma **interface web navegável**, pensada para complementar o WhatsApp:
+
+- `/` → Landing pública com:
+  - resumo do jogo,
+  - métricas em tempo quase real (jogadores, salas, artefatos de mundo),
+  - CTAs para jogar via WhatsApp e Web.
+- `/p` → Índice explorável de salas e jogadores (`mudai.places.*`, `mudai.users.*`).
+- `/p/{path}` → Renderização HTML de qualquer artefato (incluindo snapshots de salas com resumo vivo, motivos, ecos e imagens).
+- `/p/{token}` → Dashboard pessoal do jogador, com:
+  - HUD de nickname, nível e sementes,
+  - terminal HTMX para enviar comandos,
+  - lista de jogadores presentes na mesma sala,
+  - log de eventos recentes daquela sala.
+
+### Login Web
+
+Existem três formas principais de chegar ao dashboard web:
+
+- **Link direto pelo WhatsApp:**  
+  o game engine gera URLs do tipo `MUDAI_BASE_URL/p/{token}`, onde o `token` é um hash derivado do telefone. Esses links aparecem automaticamente nas respostas chave (sala, perfil, etc).
+
+- **Token colado na Landing:**  
+  na home (`/`), o usuário pode colar apenas o token de 16 caracteres que recebeu pelo WhatsApp; o backend redireciona para `/p/{token}`.
+
+- **Telefone + Código:**  
+  para quem já conversa com o MUD-AI pelo WhatsApp:
+  - `POST /auth/request-code` registra um código temporário em `mudai.login_codes.{phone}`;
+  - um fluxo externo (n8n/Chatwoot) pode enviar esse código ao jogador;
+  - `POST /auth/verify-code` valida telefone + código e redireciona para o dashboard `/p/{token}` correspondente.
+
 ---
 
 > **Lançamento Original:** Focado em conexões profundas, menos fricção visual e mais essência através do texto. Inicia com um público aberto no WhatsApp.

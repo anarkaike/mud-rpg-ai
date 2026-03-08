@@ -184,6 +184,9 @@ def format_profile(
     offers: str,
     rooms_visited: int,
     decorations: int,
+    structured_summary: str,
+    structured_worlds: list[str],
+    structured_strengths: list[str],
     suggestions: list[dict],
     profile_url: str = "",
 ) -> str:
@@ -202,6 +205,18 @@ def format_profile(
 
     if essence:
         parts.append(f"_{essence}_")
+        parts.append("")
+
+    if structured_summary:
+        parts.append(f"🧠 {structured_summary}")
+
+    worlds_preview = ", ".join(structured_worlds[:2]) if structured_worlds else ""
+    strengths_preview = ", ".join(structured_strengths[:2]) if structured_strengths else ""
+    if worlds_preview:
+        parts.append(f"🌍 Afinidades: {worlds_preview}")
+    if strengths_preview:
+        parts.append(f"✨ Forças: {strengths_preview}")
+    if structured_summary or worlds_preview or strengths_preview:
         parts.append("")
 
     parts += [
