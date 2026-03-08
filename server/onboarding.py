@@ -669,6 +669,107 @@ def _build_onboarding_meta_response(step_data: dict, nickname: str, message: str
     return narrative, hint
 
 
+def _normalize_onboarding_text(message: str) -> str:
+    return re.sub(r"\s+", " ", str(message or "").strip()).strip()
+
+
+def _tokenize_onboarding_text(message: str) -> list[str]:
+    return [token for token in re.split(r"[^\wÀ-ÿ]+", _normalize_onboarding_text(message).lower()) if token]
+
+
+def _classify_onboarding_answer(step_key: str, answer: str) -> dict:
+    text = _normalize_onboarding_text(answer)
+    lowered = text.lower()
+    tokens = _tokenize_onboarding_text(text)
+    word_count = len(tokens)
+
+    if not text:
+        return {"status": "invalid", "reason": "empty"}
+    if _looks_like_onboarding_meta_question(text):
+        return {"status": "question", "reason": "meta_question"}
+
+    generic_off_topic = {
+        "ok", "oi", "ola", "olá", "sim", "não", "nao", "talvez", "sei la", "sei lá",
+        "kkkk", "rs", "blz", "ata", "aham", "hm", "hmm"
+    }
+    if lowered in generic_off_topic:
+        return {"status": "off_topic", "reason": "generic_short_reply"}
+
+    if step_key == "nickname":
+        if len(text) > 40:
+            return {"status": "invalid", "reason": "nickname_too_long"}
+        if word_count > 4:
+            return {"status": "invalid", "reason": "nickname_too_many_words"}
+        if any(term in lowered for term in ["não sei", "nao sei", "qualquer coisa", "tanto faz"]):
+            return {"status": "off_topic", "reason": "nickname_unsure"}
+        if not re.search(r"[A-Za-zÀ-ÿ0-9]", text):
+            return {"status": "invalid", "reason": "nickname_invalid_chars"}
+        return {"status": "valid", "reason": "nickname_ok"}
+
+    if len(text) < 4:
+        return {"status": "invalid", "reason": "too_short"}
+
+    if step_key == "current_need":
+        need_terms = ["conex", "leve", "dire", "profund", "acolh", "avent", "ajuda", "ideia", "paz", "companh", "descanso", "inspira"]
+        if word_count < 2 and not any(term in lowered for term in need_terms):
+            return {"status": "invalid", "reason": "need_too_vague"}
+        return {"status": "valid", "reason": "need_ok"}
+
+    if step_key == "connection_style":
+        style_terms = ["leve", "divertid", "profund", "emoc", "intelig", "objet", "provoc", "sens", "humor", "acolh", "presença", "presenca"]
+        if word_count < 2 and not any(term in lowered for term in style_terms):
+            return {"status": "off_topic", "reason": "style_missing_signal"}
+        return {"status": "valid", "reason": "style_ok"}
+
+    if step_key == "profession_vocation":
+        job_terms = ["trabalho", "atuo", "sou", "área", "area", "profissão", "profissao", "carreira", "vocação", "vocacao", "estudo"]
+        if word_count < 3 and not any(term in lowered for term in job_terms):
+            return {"status": "off_topic", "reason": "profession_missing_context"}
+        return {"status": "valid", "reason": "profession_ok"}
+
+    if step_key in {"offer_signature", "natural_role", "world_affinity"}:
+        contribution_terms = ["ajuda", "escuta", "humor", "visão", "visao", "técnica", "tecnica", "presença", "presenca", "arte", "clareza", "cuidado", "conhecimento"]
+        if word_count < 2 and not any(term in lowered for term in contribution_terms):
+            return {"status": "off_topic", "reason": "contribution_missing_signal"}
+        return {"status": "valid", "reason": "contribution_ok"}
+
+    return {"status": "valid", "reason": "default_ok"}
+
+
+def _build_onboarding_retry_response(step_data: dict, nickname: str, answer: str, classification: dict) -> tuple[str, str]:
+    question = step_data["question"].replace("{nickname}", nickname or "viajante")
+    default_hint = step_data["hint"].replace("{nickname}", nickname or "viajante")
+    step_key = step_data["key"]
+    status = classification.get("status", "invalid")
+    reason = classification.get("reason", "unknown")
+
+    if status == "question":
+        return _build_onboarding_meta_response(step_data, nickname, answer)
+
+    if step_key == "nickname":
+        if reason == "nickname_too_long":
+            return f"Para este começo, preciso de um nome mais curto para te chamar aqui dentro. Pode ser apelido, primeiro nome ou algo simples.\n\nVoltando: {question}", "✨ _Tente responder com até 1 a 3 palavras._"
+        if reason == "nickname_too_many_words":
+            return f"Isso ficou mais como uma frase do que como nome. Quero só a forma como você quer ser chamado aqui.\n\nVoltando: {question}", "🌱 _Ex.: Luna, Rafa, Nix, Marina, Sol._"
+        if reason == "nickname_unsure":
+            return f"Se quiser, escolha só um nome provisório por enquanto. Depois você pode refinar melhor sua presença no mundo.\n\nVoltando: {question}", "💬 _Pode ser um apelido simples que combine com você._"
+        return f"Ainda não consegui usar isso como nome de chamada.\n\nVoltando: {question}", "✨ _Me diga só o nome ou apelido que quer usar aqui._"
+
+    if step_key == "current_need":
+        return f"Isso ainda ficou genérico demais para eu entender o que você busca agora.\n\nVoltando: {question}", "🎯 _Vale responder com algo como: companhia, direção, paz, ideias, acolhimento._"
+
+    if step_key == "connection_style":
+        return f"Ainda não consegui captar seu jeito de se conectar a partir disso.\n\nVoltando: {question}", "🤝 _Pode dizer o tipo de energia que te atrai: leve, profunda, inteligente, acolhedora..._"
+
+    if step_key == "profession_vocation":
+        return f"Preciso de um pouco mais de contexto para entender seu mundo e sua vocação.\n\nVoltando: {question}", "🛠 _Ex.: trabalho com produto, mas minha inclinação mais forte é educação._"
+
+    if step_key in {"offer_signature", "natural_role", "world_affinity"}:
+        return f"Ainda não ficou claro o que você traz, ocupa ou em que mundos você se sente em casa.\n\nVoltando: {question}", default_hint
+
+    return f"Ainda não consegui usar isso como resposta deste passo.\n\nVoltando: {question}", default_hint
+
+
 async def process_onboarding(phone: str, message: str) -> str:
     """
     Process an onboarding step for a player.
@@ -692,12 +793,13 @@ async def process_onboarding(phone: str, message: str) -> str:
         step_key = current_plan[current_step - 1] if len(current_plan) >= current_step else FIXED_ONBOARDING_CATEGORY_KEYS[min(current_step - 1, len(FIXED_ONBOARDING_CATEGORY_KEYS) - 1)]
         step_data = _get_category_by_key(step_key)
         field = step_data["field"]
-        answer = message.strip()
+        answer = _normalize_onboarding_text(message)
         rendered_step = _build_step_data(current_step, phone, meta)
+        classification = _classify_onboarding_answer(step_data["key"], answer)
 
-        if _looks_like_onboarding_meta_question(answer):
+        if classification.get("status") != "valid":
             nickname = meta.get("nickname", "viajante")
-            narrative, hint = _build_onboarding_meta_response(rendered_step, nickname, answer)
+            narrative, hint = _build_onboarding_retry_response(rendered_step, nickname, answer, classification)
             return fmt.format_onboarding_step(
                 step=current_step,
                 total=TOTAL_ONBOARDING_STEPS,
