@@ -233,6 +233,8 @@ def persist_social_matches(phone: str, matches: list[dict]) -> list[dict]:
             "seen_count": seen_count,
             "is_favorite": bool(existing_meta.get("is_favorite", False)),
             "favorited_at": existing_meta.get("favorited_at", ""),
+            "is_useful": bool(existing_meta.get("is_useful", False)),
+            "marked_useful_at": existing_meta.get("marked_useful_at", ""),
             "first_seen_at": existing_meta.get("first_seen_at") or db._now(),
             "last_seen_at": db._now(),
         }
@@ -249,6 +251,7 @@ def persist_social_matches(phone: str, matches: list[dict]) -> list[dict]:
             "last_seen_at": artifact.get("metadata_parsed", {}).get("last_seen_at", ""),
             "is_new": seen_count == 1,
             "is_favorite": artifact.get("metadata_parsed", {}).get("is_favorite", False),
+            "is_useful": artifact.get("metadata_parsed", {}).get("is_useful", False),
         })
 
     return persisted_matches
@@ -282,6 +285,8 @@ def list_social_match_history(phone: str, limit: int = 10) -> list[dict]:
             "complementarity_score_bonus": int(meta.get("complementarity_score_bonus", 0) or 0),
             "is_favorite": bool(meta.get("is_favorite", False)),
             "favorited_at": meta.get("favorited_at", ""),
+            "is_useful": bool(meta.get("is_useful", False)),
+            "marked_useful_at": meta.get("marked_useful_at", ""),
             "first_seen_at": meta.get("first_seen_at", ""),
             "last_seen_at": meta.get("last_seen_at", ""),
         })
@@ -290,26 +295,28 @@ def list_social_match_history(phone: str, limit: int = 10) -> list[dict]:
     return history[:limit]
 
 
+def _find_social_match_artifact(clean_phone: str, query: str) -> Optional[dict]:
+    normalized_query = (query or "").strip().lower()
+    if not normalized_query:
+        return None
+
+    artifacts = db.list_by_prefix(_social_matches_prefix(clean_phone), direct_children_only=True)
+    for artifact in artifacts:
+        meta = artifact.get("metadata_parsed", {})
+        other_phone = str(meta.get("other_phone", "")).lower()
+        nickname = str(meta.get("nickname", "")).lower()
+        if normalized_query == other_phone or normalized_query in nickname:
+            return artifact
+    return None
+
+
 def favorite_social_match(phone: str, query: str) -> Optional[dict]:
     clean = _clean_phone(phone)
     player = db.get_artifact(f"mudai.users.{clean}")
     if not player:
         return None
 
-    normalized_query = (query or "").strip().lower()
-    if not normalized_query:
-        return None
-
-    artifacts = db.list_by_prefix(_social_matches_prefix(clean), direct_children_only=True)
-    target_artifact = None
-    for artifact in artifacts:
-        meta = artifact.get("metadata_parsed", {})
-        other_phone = str(meta.get("other_phone", "")).lower()
-        nickname = str(meta.get("nickname", "")).lower()
-        if normalized_query == other_phone or normalized_query in nickname:
-            target_artifact = artifact
-            break
-
+    target_artifact = _find_social_match_artifact(clean, query)
     if not target_artifact:
         return None
 
@@ -327,11 +334,42 @@ def favorite_social_match(phone: str, query: str) -> Optional[dict]:
     return updated.get("metadata_parsed", {})
 
 
+def mark_social_match_useful(phone: str, query: str) -> Optional[dict]:
+    clean = _clean_phone(phone)
+    player = db.get_artifact(f"mudai.users.{clean}")
+    if not player:
+        return None
+
+    target_artifact = _find_social_match_artifact(clean, query)
+    if not target_artifact:
+        return None
+
+    meta = target_artifact.get("metadata_parsed", {}).copy()
+    meta["is_useful"] = True
+    meta["marked_useful_at"] = meta.get("marked_useful_at") or db._now()
+    updated = db.put_artifact(
+        path=target_artifact["path"],
+        content=target_artifact["content"],
+        content_type=target_artifact.get("content_type", "text/plain"),
+        metadata=meta,
+        is_template=False,
+        template_source=target_artifact.get("template_source"),
+    )
+    return updated.get("metadata_parsed", {})
+
+
 def list_favorite_social_matches(phone: str, limit: int = 10) -> list[dict]:
     history = list_social_match_history(phone, limit=100)
     favorites = [item for item in history if item.get("is_favorite")]
     favorites.sort(key=lambda item: (item.get("favorited_at", ""), item.get("last_seen_at", ""), item.get("seen_count", 0)), reverse=True)
     return favorites[:limit]
+
+
+def list_useful_social_matches(phone: str, limit: int = 10) -> list[dict]:
+    history = list_social_match_history(phone, limit=100)
+    useful = [item for item in history if item.get("is_useful")]
+    useful.sort(key=lambda item: (item.get("marked_useful_at", ""), item.get("last_seen_at", ""), item.get("seen_count", 0)), reverse=True)
+    return useful[:limit]
 
 
 def find_room_by_name(name: str) -> Optional[str]:

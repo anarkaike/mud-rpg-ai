@@ -97,6 +97,11 @@ CONTEXTO ATUAL:
 - Motivos recentes da sala: {room_motifs}
 - Jogador: {player_name} (Nv.{player_level}, {player_seeds} sementes)
 - Últimas respostas parecidas usadas com esse jogador: {recent_responses}
+- Sinais principais do jogador: {player_top_signals}
+- Resumo semântico do jogador: {player_profile_summary}
+- Momento atual do jogador: {player_current_moment}
+- Tons sugeridos para falar com esse jogador: {player_tone_hints}
+- Instruções de estilo para este jogador: {player_style_notes}
 
 {room_system_prompt}
 
@@ -178,6 +183,10 @@ async def process_action(phone: str, message: str) -> str:
                 return await _handle_look(phone, meta)
             case "profile":
                 return _handle_profile(phone, meta)
+            case "social_useful":
+                return _handle_useful_social_matches(phone, meta)
+            case "mark_social_useful":
+                return _handle_mark_social_match_useful(phone, meta, target)
             case "social_favorites":
                 return _handle_favorite_social_matches(phone, meta)
             case "favorite_social_match":
@@ -214,6 +223,18 @@ async def _handle_slash_command(phone: str, msg: str) -> str:
             return _handle_reset(phone)
         case "/ajuda" | "/help":
             return _handle_help()
+        case "/conexoes-uteis" | "/conexões-úteis" | "/uteis-sociais" | "/úteis-sociais":
+            clean = _clean_phone(phone)
+            player = db.get_artifact(f"mudai.users.{clean}")
+            if not player:
+                return fmt.format_error("Você ainda não tem perfil. Envie 'oi' para começar!")
+            return _handle_useful_social_matches(phone, player.get("metadata_parsed", {}))
+        case "/marcar-conexao-util" | "/marcar-conexão-útil":
+            clean = _clean_phone(phone)
+            player = db.get_artifact(f"mudai.users.{clean}")
+            if not player:
+                return fmt.format_error("Você ainda não tem perfil. Envie 'oi' para começar!")
+            return _handle_mark_social_match_useful(phone, player.get("metadata_parsed", {}), args)
         case "/conexoes-favoritas" | "/conexões-favoritas" | "/favoritas-sociais":
             clean = _clean_phone(phone)
             player = db.get_artifact(f"mudai.users.{clean}")
@@ -264,6 +285,8 @@ async def _handle_slash_command(phone: str, msg: str) -> str:
                 "Comandos disponíveis:\n"
                 "  /ajuda — ver ajuda\n"
                 "  /conexoes — ver conexões sugeridas\n"
+                "  /marcar-conexao-util NOME — salvar conexão útil\n"
+                "  /conexoes-uteis — ver úteis\n"
                 "  /favoritar-conexao NOME — salvar conexão útil\n"
                 "  /conexoes-favoritas — ver favoritas\n"
                 "  /historico-conexoes — ver memória social\n"
@@ -379,7 +402,72 @@ async def _handle_move(phone: str, meta: dict, target: str) -> str:
         badge=new_badge,
         profile_url=_generate_profile_url(phone),
     )
+
     return _attach_room_challenge(phone, meta, room_info, response, trigger="move")
+
+
+def _derive_player_tone_hints(meta: dict, profile_signals: dict) -> list[str]:
+    normalized = profile_signals.get("normalized", {}) if profile_signals else {}
+    hints = ["claro", "humano"]
+
+    if float(normalized.get("technicality", 0.0) or 0.0) >= 0.6:
+        hints.append("objetivo")
+    if float(normalized.get("reflection", 0.0) or 0.0) >= 0.6:
+        hints.append("reflexivo")
+    if float(normalized.get("creativity", 0.0) or 0.0) >= 0.6:
+        hints.append("criativo")
+    if float(normalized.get("humanity", 0.0) or 0.0) >= 0.6 or float(normalized.get("support", 0.0) or 0.0) >= 0.6:
+        hints.append("acolhedor")
+    if float(normalized.get("intensity", 0.0) or 0.0) >= 0.6:
+        hints.append("intenso-sem-exagero")
+    if float(normalized.get("practicality", 0.0) or 0.0) >= 0.6:
+        hints.append("prático")
+
+    return list(dict.fromkeys(hints))[:5]
+
+
+def _build_player_style_notes(meta: dict, profile_signals: dict) -> str:
+    normalized = profile_signals.get("normalized", {}) if profile_signals else {}
+    top = profile_signals.get("top", []) if profile_signals else []
+    notes = ["Se adapte levemente ao jeito do jogador sem parecer forçado."]
+
+    if top:
+        notes.append(f"Priorize linguagem compatível com estes sinais: {', '.join(top[:4])}.")
+    if float(normalized.get("technicality", 0.0) or 0.0) >= 0.6:
+        notes.append("Prefira respostas mais estruturadas e concretas.")
+    if float(normalized.get("reflection", 0.0) or 0.0) >= 0.6:
+        notes.append("Pode trazer profundidade leve, mas sem ficar poética demais.")
+    if float(normalized.get("creativity", 0.0) or 0.0) >= 0.6:
+        notes.append("Use sensibilidade e imaginação com moderação.")
+    if float(normalized.get("humanity", 0.0) or 0.0) >= 0.6 or float(normalized.get("support", 0.0) or 0.0) >= 0.6:
+        notes.append("Valorize acolhimento, escuta e vínculo quando fizer sentido.")
+    if float(normalized.get("practicality", 0.0) or 0.0) >= 0.6:
+        notes.append("Quando a pessoa pedir direção, responda com clareza acionável.")
+    if float(normalized.get("intensity", 0.0) or 0.0) >= 0.6:
+        notes.append("Aceite intensidade, mas mantenha contenção e segurança no tom.")
+
+    return " ".join(notes[:5])
+
+
+def _build_structured_profile_context(meta: dict) -> dict:
+    structured = meta.get("structured_profile", {}) if isinstance(meta.get("structured_profile", {}), dict) else {}
+    summary = str(structured.get("summary", "")).strip() or "sem resumo semântico ainda"
+    current_moment = structured.get("current_moment", [])
+    communication_style = structured.get("communication_style", [])
+
+    if not isinstance(current_moment, list):
+        current_moment = []
+    if not isinstance(communication_style, list):
+        communication_style = []
+
+    current_moment_text = ", ".join(str(item).strip() for item in current_moment[:3] if str(item).strip()) or "não identificado claramente"
+    communication_style_text = ", ".join(str(item).strip() for item in communication_style[:3] if str(item).strip())
+
+    return {
+        "summary": summary[:220],
+        "current_moment": current_moment_text[:220],
+        "communication_style": communication_style_text[:180],
+    }
 
 
 async def _handle_look(phone: str, meta: dict) -> str:
@@ -454,6 +542,20 @@ def _handle_social_matches(phone: str, meta: dict) -> str:
 def _handle_social_match_history(phone: str, meta: dict) -> str:
     history = rooms.list_social_match_history(phone, limit=8)
     return fmt.format_social_match_history(history, profile_url=_generate_profile_url(phone))
+
+
+def _handle_mark_social_match_useful(phone: str, meta: dict, target: str) -> str:
+    if not (target or "").strip():
+        return fmt.format_error("Use /marcar-conexao-util NOME para marcar alguém da sua memória social.")
+    saved = rooms.mark_social_match_useful(phone, target)
+    if not saved:
+        return fmt.format_error("Não encontrei essa conexão na sua memória social. Veja /historico-conexoes primeiro.")
+    return fmt.format_social_useful_saved(saved, profile_url=_generate_profile_url(phone))
+
+
+def _handle_useful_social_matches(phone: str, meta: dict) -> str:
+    useful = rooms.list_useful_social_matches(phone, limit=8)
+    return fmt.format_useful_social_matches(useful, profile_url=_generate_profile_url(phone))
 
 
 def _handle_favorite_social_match(phone: str, meta: dict, target: str) -> str:
@@ -689,6 +791,13 @@ async def _handle_chat(phone: str, meta: dict, message: str) -> str:
         room_meta = room_info.get("metadata", {})
         room_system_prompt = room_meta.get("system_prompt", "")
     recent_responses = world_state.recent_responses(f"player.{_clean_phone(phone)}", limit=4)
+    player_profile_signals = meta.get("profile_signals", {})
+    player_structured_profile = _build_structured_profile_context(meta)
+    player_top_signals = ", ".join(player_profile_signals.get("top", [])[:4]) or "nenhum forte ainda"
+    player_tone_hints = ", ".join(_derive_player_tone_hints(meta, player_profile_signals))
+    player_style_notes = _build_player_style_notes(meta, player_profile_signals)
+    if player_structured_profile.get("communication_style"):
+        player_style_notes = f"{player_style_notes} Considere também: {player_structured_profile['communication_style']}."
 
     # Build contextual prompt
     prompt = CHAT_PROMPT.format(
@@ -700,6 +809,11 @@ async def _handle_chat(phone: str, meta: dict, message: str) -> str:
         player_level=_calculate_level(meta),
         player_seeds=meta.get("seeds", 0),
         recent_responses=" | ".join(recent_responses) if recent_responses else "nenhuma",
+        player_top_signals=player_top_signals,
+        player_profile_summary=player_structured_profile.get("summary", "sem resumo semântico ainda"),
+        player_current_moment=player_structured_profile.get("current_moment", "não identificado claramente"),
+        player_tone_hints=player_tone_hints,
+        player_style_notes=player_style_notes,
         room_system_prompt=f"INSTRUÇÕES EXTRAS DA SALA:\n{room_system_prompt}" if room_system_prompt else "",
         message=message,
     )
@@ -760,6 +874,10 @@ async def _parse_action(message: str) -> dict:
         "look": {"action": "look", "target": ""},
         "perfil": {"action": "profile", "target": ""},
         "eu": {"action": "profile", "target": ""},
+        "conexoes uteis": {"action": "social_useful", "target": ""},
+        "conexões úteis": {"action": "social_useful", "target": ""},
+        "uteis sociais": {"action": "social_useful", "target": ""},
+        "úteis sociais": {"action": "social_useful", "target": ""},
         "conexoes favoritas": {"action": "social_favorites", "target": ""},
         "conexões favoritas": {"action": "social_favorites", "target": ""},
         "favoritas sociais": {"action": "social_favorites", "target": ""},
@@ -800,6 +918,10 @@ async def _parse_action(message: str) -> dict:
     match_keywords = ["conex", "compat", "match", "quem pode me ajudar", "com quem posso falar"]
     if any(kw in msg for kw in match_keywords):
         return {"action": "matches", "target": ""}
+
+    useful_keywords = ["conexoes uteis", "conexões úteis", "uteis sociais", "úteis sociais"]
+    if any(kw in msg for kw in useful_keywords):
+        return {"action": "social_useful", "target": ""}
 
     favorite_keywords = ["conexoes favoritas", "conexões favoritas", "favoritas sociais"]
     if any(kw in msg for kw in favorite_keywords):
@@ -915,7 +1037,7 @@ def _ensure_active_challenge(phone: str, meta: dict, room_info: dict, trigger: s
         return None
 
     mission = world_state.get_player_room_mission(current_room, meta)
-    challenge = _build_room_mission_challenge(mission) if mission else _build_room_challenge(room_info)
+    challenge = _build_room_mission_challenge(mission, meta) if mission else _build_room_challenge(room_info, meta)
     if not challenge:
         return None
     _update_meta(phone, {
@@ -925,13 +1047,15 @@ def _ensure_active_challenge(phone: str, meta: dict, room_info: dict, trigger: s
     return challenge
 
 
-def _build_room_challenge(room_info: dict) -> dict | None:
+def _build_room_challenge(room_info: dict, player_meta: dict | None = None) -> dict | None:
     room_path = room_info.get("path", "")
     room_name = room_info.get("name", "Sala")
     motifs = room_info.get("motifs", [])[:3]
     highlights = room_info.get("recent_contributions", [])[:2]
     purpose = room_info.get("purpose", "")
     tags = room_info.get("tags", [])
+    profile_signals = (player_meta or {}).get("profile_signals", {})
+    normalized_signals = profile_signals.get("normalized", {}) if profile_signals else {}
     challenge_type = "reflexão"
     instruction = "Deixe uma frase curta dizendo o que este lugar desperta em você."
 
@@ -953,6 +1077,19 @@ def _build_room_challenge(room_info: dict) -> dict | None:
             challenge_type = "perspectiva"
             instruction = f"Responda ao eco recente da sala com 1 frase nova: \"{excerpt}\""
 
+    if float(normalized_signals.get("technicality", 0.0) or 0.0) >= 0.7 and challenge_type in {"reflexão", "perspectiva"}:
+        instruction = f"Em 1 ou 2 frases, dê uma leitura clara e concreta sobre {room_name}."
+    elif float(normalized_signals.get("creativity", 0.0) or 0.0) >= 0.7 and challenge_type in {"reflexão", "perspectiva"}:
+        challenge_type = "história"
+        instruction = f"Escreva uma frase viva que combine com o clima de {room_name} sem exagerar no tamanho."
+    elif float(normalized_signals.get("support", 0.0) or 0.0) >= 0.7 or float(normalized_signals.get("humanity", 0.0) or 0.0) >= 0.7:
+        if challenge_type in {"reflexão", "troca", "perspectiva"}:
+            instruction = f"Em 1 frase, diga algo que possa acolher, ajudar ou fortalecer quem passar por {room_name}."
+    elif float(normalized_signals.get("practicality", 0.0) or 0.0) >= 0.7:
+        instruction = f"Responda com 1 frase útil e prática que faça sentido dentro de {room_name}."
+    elif float(normalized_signals.get("intensity", 0.0) or 0.0) >= 0.7 and challenge_type == "reflexão":
+        instruction = f"Em 1 frase forte e honesta, diga o que este lugar ativa em você."
+
     challenge_id = hashlib.sha256(f"{room_path}:{instruction}".encode()).hexdigest()[:12]
     return {
         "id": challenge_id,
@@ -966,7 +1103,7 @@ def _build_room_challenge(room_info: dict) -> dict | None:
     }
 
 
-def _build_room_mission_challenge(mission: dict | None) -> dict | None:
+def _build_room_mission_challenge(mission: dict | None, player_meta: dict | None = None) -> dict | None:
     if not mission:
         return None
     meta = mission.get("metadata_parsed", {})
@@ -974,11 +1111,23 @@ def _build_room_mission_challenge(mission: dict | None) -> dict | None:
     if not mission_id:
         return None
     mission_type = meta.get("mission_type", "missão")
+    profile_signals = (player_meta or {}).get("profile_signals", {})
+    normalized_signals = profile_signals.get("normalized", {}) if profile_signals else {}
     challenge_type_map = {
         "echo": "reflexão",
         "bridge": "perspectiva",
         "exchange": "troca",
     }
+    instruction = meta.get("instruction", mission.get("content", ""))
+    if float(normalized_signals.get("technicality", 0.0) or 0.0) >= 0.7:
+        instruction = f"Responda com clareza e objetividade: {instruction}"
+    elif float(normalized_signals.get("creativity", 0.0) or 0.0) >= 0.7:
+        instruction = f"Responda de forma viva e autoral, em poucas linhas: {instruction}"
+    elif float(normalized_signals.get("support", 0.0) or 0.0) >= 0.7 or float(normalized_signals.get("humanity", 0.0) or 0.0) >= 0.7:
+        instruction = f"Responda de um jeito humano e útil para quem ler depois: {instruction}"
+    elif float(normalized_signals.get("practicality", 0.0) or 0.0) >= 0.7:
+        instruction = f"Se puder, responda com algo claro, aplicável e direto: {instruction}"
+
     return {
         "id": mission_id,
         "mission_id": mission_id,
@@ -986,7 +1135,7 @@ def _build_room_mission_challenge(mission: dict | None) -> dict | None:
         "room_name": meta.get("room_name", "Sala"),
         "title": meta.get("title", "Missão"),
         "type": challenge_type_map.get(mission_type, "reflexão"),
-        "instruction": meta.get("instruction", mission.get("content", "")),
+        "instruction": instruction,
         "reward_seeds": meta.get("reward_seeds", SEEDS_REWARDS["challenge"]),
         "status": "active",
         "source": "room_mission",

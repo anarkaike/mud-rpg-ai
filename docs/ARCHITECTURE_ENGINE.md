@@ -61,7 +61,7 @@ O backend também cruza o que cada jogador busca com o que outros jogadores ofer
 * **Acesso por comando:** o engine expõe as sugestões via `/conexoes`, `conexoes` e aliases equivalentes, sem depender da interface web.
 * **Memória persistida:** cada consulta pode registrar artifacts em `mudai.users.{phone}.social_matches.{other_phone}` com score, termos em comum e contagem de vezes em que aquela conexão foi sugerida.
 * **Consulta histórica:** o backend também permite revisar essa memória social via `/historico-conexoes` e aliases equivalentes, ordenando conexões por recência e recorrência.
-* **Curadoria social:** conexões persistidas podem ser marcadas como favoritas via `/favoritar-conexao` e revisitadas em `/conexoes-favoritas`, preservando esse estado entre novas consultas.
+* **Curadoria social:** conexões persistidas podem ser marcadas como favoritas via `/favoritar-conexao` e como úteis via `/marcar-conexao-util`, com revisões dedicadas em `/conexoes-favoritas` e `/conexoes-uteis`, preservando esse estado entre novas consultas.
 * **Objetivo:** incentivar conversas, trocas e afinidades reais usando os dados já coletados no onboarding e no perfil do jogador.
 
 ---
