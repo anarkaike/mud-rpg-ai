@@ -1,74 +1,45 @@
-# 🎮 MUD-AI — Documentação do Projeto
+# 🎮 MUD-AI
 
 <p align="center">
-  <b>🏠 Início</b> | <a href="./PRD_ANALISE.md">PRD Análise</a> | <a href="./PESQUISA_MUDS.md">Pesquisa de MUDs</a> | <a href="./desktop/01_VISAO_E_CONCEITO.md">Visão e Conceito ▶</a>
+  <b>🏠 Início</b> | <a href="./ARCHITECTURE_ENGINE.md">Arquitetura & Engine</a> | <a href="./GAMEPLAY_CURRENT.md">Gameplay Atual</a> | <a href="./desktop/01_VISAO_E_CONCEITO.md">Ideaçaõ Original ▶</a>
 </p>
 
-> **RPG textual multiplayer mediado por IA, jogado via WhatsApp, com interação no mundo real através de QR Codes.**
+> **RPG textual multiplayer mediado por IA, jogado via WhatsApp, com interface web minimalista baseada em Glassmorphism.**
 
 ---
 
-## 📂 Estrutura da Documentação
+## 📂 Estrutura de Documentação (v2 Atualizada)
 
-- [README.md](./README.md) ← Você está aqui
-- [PRD_ANALISE.md](./PRD_ANALISE.md) ← Análise do PRD de referência
-- [PESQUISA_MUDS.md](./PESQUISA_MUDS.md) ← Comparação de MUDs e engines
-- **desktop/** ← 🧠 Mesa de trabalho (ideias & rascunhos)
-  - [01_VISAO_E_CONCEITO.md](./desktop/01_VISAO_E_CONCEITO.md) ← Visão, Pilares e Público
-  - [02_GAMEPLAY_E_MECANICAS.md](./desktop/02_GAMEPLAY_E_MECANICAS.md) ← Ciclo de Jogo e Experiência
-  - [03_ARQUITETURA_TECNICA.md](./desktop/03_ARQUITETURA_TECNICA.md) ← N8N, IA, Dados, Fluxos
-  - [04_MONETIZACAO_E_CRESCIMENTO.md](./desktop/04_MONETIZACAO_E_CRESCIMENTO.md) ← Modelos B2B/B2C, Fases
-  - [05_PITCH_RESUMO.md](./desktop/05_PITCH_RESUMO.md) ← Pitch Comercial/Apresentação
-  - [06_ECONOMIA_SALAS_IDENTIDADE.md](./desktop/06_ECONOMIA_SALAS_IDENTIDADE.md) ← Economia, Salas e Avatares
+- [README.md](./README.md) ← Visão Geral (Você está aqui)
+- [ARCHITECTURE_ENGINE.md](./ARCHITECTURE_ENGINE.md) ← Documentação técnica do Backend em FastAPI + AI
+- [GAMEPLAY_CURRENT.md](./GAMEPLAY_CURRENT.md) ← Economia, Loop Central, Sementes (🪙) e Progressão
+- **Histórico & Ideação (Março 2026):**
+  - [PRD_ANALISE.md](./PRD_ANALISE.md) | [PESQUISA_MUDS.md](./PESQUISA_MUDS.md)
+  - **desktop/** ← Documentos originais de brainstorming, visão e pitch. *(Mantidos para contexto)*
 
-## 🎯 O que é este Projeto?
+## 🎯 O que é o MUD-AI Hoje?
 
-Um agente de IA (via N8N) que transforma uma conversa pelo WhatsApp em um **[MUD (Multi-User Dungeon)](./PESQUISA_MUDS.md)** — um RPG textual multiplayer onde:
+O projeto evoluiu de uma ideia mediada puramente por fluxos no n8n para um **Motor Próprio (Custom Game Engine)** construído em **FastAPI (Python)**. 
 
-- **Jogadores interagem por texto** (WhatsApp) com um mundo persistente mediado por IA
-- **QR Codes em locais físicos** (bares, eventos, empreendimentos) destravam conteúdo no jogo
-- **Jogadores interagem entre si** no mundo real e no virtual, trocando códigos e colaborando
-- **A IA é mediadora**: reformula textos, facilita conexões, propõe reflexões
+Ele transforma uma conversa pelo WhatsApp em um **MUD (Multi-User Dungeon) Moderno**, focado no poder da linguagem e das narrativas.
 
-## Contexto
-
-O projeto nasce com o objetivo de:
-
-1. **Conectar comunidades** de forma profunda e significativa
-2. **Fortalecer empreendimentos locais** (bares, eventos, negócios)
-3. **Facilitar reflexão** e autoconhecimento através do jogo
-4. **Resgatar a simplicidade do bate-papo** — textual, mental, sem fricção (menos aparência, mais essência)
-
-> **Lançamento**: A primeira comunidade será a LGBTQIA+ (via rede Guia Gay), mas a plataforma é projetada para escalar para **qualquer comunidade** que valorize conexão por essência.
-
-### Comunidades Potenciais
-
-| Fase | Comunidade | Por que? |
-|------|-----------|----------|
-| 🚀 Lançamento | Comunidade LGBTQIA+ | Público existente via Guia Gay, alta afinidade com texto e conexão profunda |
-| 🌿 Expansão 1 | Artesãos e makers | Universo rico de criação, troca de habilidades |
-| 🌿 Expansão 1 | Autistas e introvertidos | Riqueza interior que precisa de pontes para o exterior, texto como meio ideal |
-| 🌿 Expansão 1 | Desenvolvedores e designers | Perfil digital-first, cultura de comunidade e mentoria |
-| 🌳 Expansão 2 | Varejo e bairros | Fortalecimento de comércio local |
-| 🌳 Expansão 2 | Times esportivos / vôlei | Conexão entre membros, eventos |
-| 🌳 Expansão 2 | Estudantes e jovens | Exploração, autoconhecimento, network |
-| 🌲 Escala | Turistas e intercâmbio cultural | Exploração de cidades, conexão multilíngue |
-| 🌲 Escala | Gamers | Público natural de RPG textual |
-| 🌲 Escala | Pessoas em parques/espaços públicos | QR Codes em espaços comunitários |
-
-## 📖 Como usar esta documentação
-
-| Pasta | Propósito |
-|-------|-----------|
-| `docs/` | Documentos oficiais, pesquisas e análises |
-| `docs/desktop/` | Mesa de trabalho: ideias em amadurecimento, rascunhos temporários, brainstorms |
-
-> **Filosofia**: Começar simples como uma semente 🌱 e crescer organicamente com os próprios jogadores. Para entender mais, veja nossa [Estratégia de Crescimento](./desktop/04_MONETIZACAO_E_CRESCIMENTO.md).
+### Principais Pilares da Implementação:
+1. **Engine FastAPI Super-Rápida:** Todo o processamento mental ocorre no app Python hospedado via Docker (Coolify). O n8n / Chatwoot atua apenas como gateway que passa e recebe mensagens limpas de Webhook.
+2. **Sistema VFS Baseado em Artifacts:** Sem tabelas tradicionais relacional-engessadas. Tudo é um artefato persistido e cacheado que pode ser modificado com extrema liberdade `(mudai.users.*, mudai.places.*)`.
+3. **Onboarding Guiado e Imersivo por IA:** Ao entrar, uma inteligência artificial cria perguntas de onboarding vastamente criativas (sobre nomes, traços e essência) para evitar repetição massante, premiando dicas personalizadas instantaneamente via JSON (OpenAI flash fallback into Gemini).
+4. **Economia Textual de Sementes (🪙):** Uma moeda in-game controlada nos artefatos. Interações longas podem consumir; ser validador de interações engajadoras e trazer novos usuários bonifica e preenche seu personagem.
+5. **Perfis Públicos na Web:** Para combater a limitação das caixas apertadas do WhatsApp, links de perfil são criados por hashes (`/p/{token}`), permitindo aos usuários e estranhos visualizarem murais/tags lindamente estilizados em CSS puro.
 
 ---
 
-<p align="center">
-  <b>🏠 Início</b> | <a href="./desktop/01_VISAO_E_CONCEITO.md">Visão e Conceito ▶</a>
-</p>
+> **Lançamento Original:** Focado em conexões profundas, menos fricção visual e mais essência através do texto. Inicia com um público aberto no WhatsApp.
 
-*Projeto em fase de ideação e design — Março 2026*
+## 📖 Fluxo Básico de Uso (Devs)
+
+Se deseja entender a fundo como cada sistema interage via código, comece por:
+- 🛠️ [Como Funciona o Banco/Engine?](./ARCHITECTURE_ENGINE.md)
+- 🎲 [Qual a Teoria da Economia In-Game Hoje?](./GAMEPLAY_CURRENT.md) 
+
+<p align="center">
+  *MUD-AI — Onde palavras tornam-se mundos. (Arquitetura Atualizada)*
+</p>
