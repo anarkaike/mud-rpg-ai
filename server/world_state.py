@@ -60,6 +60,11 @@ def ensure_room_state(room_path: str, room_name: str = "", purpose: str = "", ta
         "challenge_completion_count": 0,
         "last_consequence_type": "bootstrap",
         "last_consequence_summary": "",
+        "poetic_echoes": 0,
+        "exchange_offers": 0,
+        "exchange_requests": 0,
+        "support_echoes": 0,
+        "last_block_flavor": "",
     }
     return db.put_artifact(path=path, content=room_name or room_path, metadata=metadata)
 
@@ -177,6 +182,9 @@ def record_room_block(
     block_id = uuid.uuid4().hex[:12]
     path = f"{room_blocks_prefix(room_path)}{block_id}"
     tags = extract_tags(clean_content)
+    state = ensure_room_state(room_path)
+    state_meta = state.get("metadata_parsed", {}) if state else {}
+    block_analysis = analyze_room_block(clean_content, state_meta)
     metadata = {
         "id": block_id,
         "room_path": room_path,
@@ -187,6 +195,7 @@ def record_room_block(
         "impact_score": calculate_impact_score(clean_content, block_type),
         "tags": tags,
         "used_in_summary": False,
+        "flavor": block_analysis.get("primary_flavor", "generic"),
     }
     block = db.put_artifact(path=path, content=clean_content, metadata=metadata)
     
@@ -201,11 +210,20 @@ def record_room_block(
     _add_to_game_log(room_path, log_entry)
     apply_room_consequence(
         room_path=room_path,
-        consequence_type=block_type,
-        summary=f"{author_name} alterou o clima da sala com um novo eco.",
+        consequence_type=f"{block_type}_{block_analysis.get('primary_flavor', 'generic')}",
+        summary=build_room_consequence_summary(author_name, block_analysis),
         intensity=max(1, int(metadata.get("impact_score", 1) or 1)),
-        social_delta=1 if block_type in {"mission_response", "challenge_response"} else 0,
+        social_delta=block_analysis.get("social_delta", 0) + (1 if block_type in {"mission_response", "challenge_response"} else 0),
     )
+    if state:
+        refreshed_state = db.get_artifact(state["path"]) or state
+        refreshed_meta = refreshed_state.get("metadata_parsed", {}).copy()
+        refreshed_meta["poetic_echoes"] = int(refreshed_meta.get("poetic_echoes", 0) or 0) + int(block_analysis.get("poetic_echo", 0) or 0)
+        refreshed_meta["exchange_offers"] = int(refreshed_meta.get("exchange_offers", 0) or 0) + int(block_analysis.get("exchange_offer", 0) or 0)
+        refreshed_meta["exchange_requests"] = int(refreshed_meta.get("exchange_requests", 0) or 0) + int(block_analysis.get("exchange_request", 0) or 0)
+        refreshed_meta["support_echoes"] = int(refreshed_meta.get("support_echoes", 0) or 0) + int(block_analysis.get("support_echo", 0) or 0)
+        refreshed_meta["last_block_flavor"] = block_analysis.get("primary_flavor", "generic")
+        db.put_artifact(path=refreshed_state["path"], content=refreshed_state["content"], metadata=refreshed_meta)
 
     _refresh_room_state(room_path)
     return block
@@ -257,6 +275,27 @@ def ensure_room_image_stub(room_path: str, reason: str = "room evolution") -> di
         meta["last_refresh_reason"] = reason
         db.put_artifact(path=state["path"], content=state["content"], metadata=meta)
     return image
+
+
+def mark_room_image_ready(room_path: str, image_path: str) -> Optional[dict]:
+    target = db.get_artifact(image_path)
+    if not target:
+        return None
+
+    for artifact in list_room_images(room_path, limit=50):
+        metadata = artifact.get("metadata_parsed", {}).copy()
+        metadata["is_active"] = artifact["path"] == image_path
+        db.put_artifact(path=artifact["path"], content=artifact.get("content", ""), metadata=metadata)
+
+    refreshed = db.get_artifact(image_path)
+    state = get_room_state(room_path)
+    if state:
+        meta = state.get("metadata_parsed", {})
+        meta["image_pool_size"] = len(list_room_images(room_path))
+        meta["image_refresh_needed"] = False
+        meta["last_ready_image_path"] = image_path
+        db.put_artifact(path=state["path"], content=state["content"], metadata=meta)
+    return refreshed
 
 
 def get_random_room_image(room_path: str) -> Optional[dict]:
@@ -343,6 +382,50 @@ def extract_tags(text: str, limit: int = 6) -> list[str]:
     }
     ranked = [word for word, _ in Counter(w for w in words if w not in stopwords).most_common(limit)]
     return ranked
+
+
+def analyze_room_block(text: str, room_state_meta: dict | None = None) -> dict:
+    normalized = normalize_text(text).lower()
+    tags = [str(tag or "").lower() for tag in (room_state_meta or {}).get("tags", [])]
+    purpose = str((room_state_meta or {}).get("purpose", "") or "").lower()
+    poetic = int(len([line for line in text.splitlines() if line.strip()]) >= 2 or any(term in normalized for term in ["verso", "poema", "silêncio", "silencio", "luz", "maré", "mare"]))
+    exchange_offer = int(any(term in normalized for term in ["ofereço", "ofereco", "posso ajudar", "entrego", "compartilho"]))
+    exchange_request = int(any(term in normalized for term in ["procuro", "busco", "preciso", "quero encontrar", "alguém de", "alguem de"]))
+    support_echo = int(any(term in normalized for term in ["acolho", "acolher", "apoio", "cuidar", "escuta", "escutar", "fortalecer"]))
+    if any(tag in tags for tag in ["poesia", "escrita"]) or any(term in purpose for term in ["poesia", "escrita", "verso"]):
+        poetic = max(poetic, 1)
+    if any(tag in tags for tag in ["troca", "conexão", "conexao", "networking"]) or any(term in purpose for term in ["troca", "networking", "conex"]):
+        if exchange_offer or exchange_request:
+            support_echo = max(support_echo, 0)
+    flavor_scores = {
+        "poetic": poetic,
+        "exchange_offer": exchange_offer,
+        "exchange_request": exchange_request,
+        "support": support_echo,
+    }
+    primary_flavor = max(flavor_scores, key=lambda key: (flavor_scores[key], key)) if any(flavor_scores.values()) else "generic"
+    social_delta = exchange_offer + exchange_request + support_echo
+    return {
+        "primary_flavor": primary_flavor,
+        "poetic_echo": poetic,
+        "exchange_offer": exchange_offer,
+        "exchange_request": exchange_request,
+        "support_echo": support_echo,
+        "social_delta": social_delta,
+    }
+
+
+def build_room_consequence_summary(author_name: str, block_analysis: dict) -> str:
+    flavor = block_analysis.get("primary_flavor", "generic")
+    if flavor == "poetic":
+        return f"{author_name} deixou um eco poético que mudou o tom da sala."
+    if flavor == "exchange_offer":
+        return f"{author_name} abriu uma nova oferta de troca neste espaço."
+    if flavor == "exchange_request":
+        return f"{author_name} lançou um pedido que pode puxar novas conexões."
+    if flavor == "support":
+        return f"{author_name} reforçou um clima de apoio e presença nesta sala."
+    return f"{author_name} alterou o clima da sala com um novo eco."
 
 
 def calculate_impact_score(text: str, block_type: str) -> int:
@@ -451,7 +534,17 @@ def synthesize_room_summary(room_path: str, blocks: list[dict], motifs: list[str
         return f"{room_name.title()} aguarda novas contribuições para ganhar forma coletiva."
     excerpts = [truncate(block.get("content", ""), 80) for block in blocks[:3] if block.get("content")]
     motif_text = ", ".join(motifs[:3]) if motifs else "presença, memória e descoberta"
-    return f"{room_name.title()} pulsa com {motif_text}. Ecos recentes: {' | '.join(excerpts)}"
+    poetic_count = sum(1 for block in blocks[:8] if block.get("metadata_parsed", {}).get("flavor") == "poetic")
+    exchange_count = sum(1 for block in blocks[:8] if block.get("metadata_parsed", {}).get("flavor") in {"exchange_offer", "exchange_request"})
+    support_count = sum(1 for block in blocks[:8] if block.get("metadata_parsed", {}).get("flavor") == "support")
+    contextual_suffix = ""
+    if poetic_count >= 2:
+        contextual_suffix = " A sala está especialmente lírica nos últimos ecos."
+    elif exchange_count >= 2:
+        contextual_suffix = " O espaço está puxando trocas e conexões de forma bem viva."
+    elif support_count >= 2:
+        contextual_suffix = " Há um clima forte de apoio e escuta se formando aqui."
+    return f"{room_name.title()} pulsa com {motif_text}. Ecos recentes: {' | '.join(excerpts)}{contextual_suffix}"
 
 
 def synthesize_visual_summary(room_path: str, blocks: list[dict], motifs: list[str]) -> str:

@@ -24,6 +24,7 @@ Cada sala pode acumular estado persistente próprio fora do markdown original.
 * **Missões locais:** salas podem gerar missões persistentes baseadas no propósito e nos motivos recentes, oferecendo desafios leves sem depender de frontend.
 * **Logs persistentes:** eventos relevantes entram em `game_log`, permitindo refletir no estado vivo da sala e em leituras futuras.
 * **Consequências persistentes:** o estado também acumula `momentum_score`, `social_heat`, `challenge_completion_count`, `last_consequence_type` e `last_consequence_summary`, reagindo a novos blocos, conclusões de missão e marcos sociais disparados no engine.
+* **Flavor contextual por sala:** o backend agora classifica ecos recentes como `poetic`, `exchange_offer`, `exchange_request` ou `support`, acumulando contadores como `poetic_echoes`, `exchange_offers`, `exchange_requests` e `support_echoes` para deixar salas de poesia, escrita e troca mais coerentes com o que os jogadores realmente postam.
 * **Objetivo:** fazer cada ambiente ganhar memória própria e parecer um lugar em transformação contínua.
 
 ### 2. Game Engine e Parser (`server/game_engine.py`)
@@ -74,6 +75,7 @@ O backend também cruza o que cada jogador busca com o que outros jogadores ofer
 * **Memória enriquecida:** cada conexão persistida também pode receber nota privada e tags manuais via `/anotar-conexao NOME :: nota` e `/taguear-conexao NOME :: tag1, tag2`, exibidas nas listagens sociais relevantes.
 * **Reciprocidade bilateral:** quando dois jogadores confirmam a conexão nos dois sentidos, o backend sincroniza o estado mútuo nos dois artifacts e expõe esse vínculo via `/conexoes-mutuas`.
 * **Progressão por relações:** ações sociais relevantes atualizam `relationship_progress` no metadata do jogador, liberando pequenas recompensas em sementes e badges quando marcos como primeira confirmação, primeira conexão mútua ou curadoria social são atingidos.
+* **Interpretabilidade conversacional:** o engine passou a inferir comandos implícitos em linguagem natural sem depender de `/`, distinguindo dúvida de execução, extraindo a essência de ideias decorativas e tratando textos livres em salas de poesia/escrita/troca como contribuições prováveis quando o contexto deixa isso claro.
 * **Objetivo:** incentivar conversas, trocas e afinidades reais usando os dados já coletados no onboarding e no perfil do jogador.
 
 ---

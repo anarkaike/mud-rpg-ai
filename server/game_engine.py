@@ -9,6 +9,7 @@ import hashlib
 import re
 from . import database as db
 from . import message_formatter as fmt
+from .image_pipeline import enqueue_room_image_generation
 from . import room_manager as rooms
 from . import world_state
 from .onboarding import start_onboarding, process_onboarding, _update_meta, _clean_phone
@@ -211,8 +212,14 @@ async def process_action(phone: str, message: str) -> str:
     if pending_response:
         return pending_response
 
+    active_challenge = meta.get("active_challenge")
+    if active_challenge:
+        challenge_response = _resolve_active_challenge(phone, meta, message, active_challenge)
+        if challenge_response:
+            return challenge_response
+
     # 3. Parse player intent
-    action = await _parse_action(message)
+    action = await _parse_action(message, meta)
     action_type = action.get("action", "chat")
     target = action.get("target", "")
 
@@ -251,8 +258,10 @@ async def process_action(phone: str, message: str) -> str:
                 return _handle_social_matches(phone, meta)
             case "explore":
                 return _handle_explore(phone, meta)
+            case "decorate_question":
+                return _handle_decor_question(phone, meta, target or message)
             case "decorate":
-                return await _handle_decorate(phone, meta, message)
+                return await _handle_decorate(phone, meta, target or message)
             case "help":
                 return _handle_help()
             case "seeds":
@@ -808,7 +817,7 @@ async def _handle_decorate(phone: str, meta: dict, message: str) -> str:
     room_state = world_state.get_room_state(current_room)
     state_meta = room_state.get("metadata_parsed", {}) if room_state else {}
     if state_meta.get("image_refresh_needed"):
-        world_state.ensure_room_image_stub(current_room, reason="new decoration")
+        await enqueue_room_image_generation(current_room, reason="new decoration")
 
     # Deduct seed cost + award participation seed (net 0 first time, but tracks)
     new_seeds = seeds - SEEDS_COSTS["decorate"] + SEEDS_REWARDS["decorate"]
@@ -918,9 +927,13 @@ def _looks_like_decor_question(message: str) -> bool:
     decor_signals = [
         "arvore", "árvore", "flor", "flores", "planta", "jardim", "vela", "velas",
         "quadro", "mural", "sofá", "sofa", "mesa", "recepção", "recepcao", "decor",
-        "colocar", "botar", "por ",
+        "colocar", "botar", "por ", "adicionar", "adiciona", "adicione", "adicao", "adição",
+        "sala", "lugar", "aqui", "nesse lugar", "nesta sala", "arco iris", "arco-iris", "arco íris",
     ]
-    return any(signal in text for signal in question_signals) and any(signal in text for signal in decor_signals)
+    room_change_signals = ["adicionar", "adiciona", "adicione", "colocar", "botar", "por ", "decor", "mudar", "deixar"]
+    if any(signal in text for signal in question_signals) and any(signal in text for signal in decor_signals):
+        return True
+    return any(signal in text for signal in question_signals) and any(signal in text for signal in room_change_signals) and any(signal in text for signal in ["sala", "lugar", "aqui", "nesse lugar", "nesta sala"])
 
 
 def _contains_any(text: str, options: list[str]) -> bool:
@@ -967,7 +980,77 @@ def _looks_like_direct_decoration_intent(message: str) -> bool:
     return text.startswith(imperative_starts) or (_contains_any(text, list(decor_terms)) and _contains_any(text, ["adicion", "coloc", "bot", "decor", "ponh", "por "]))
 
 
-def _infer_conversational_action(message: str) -> dict | None:
+def _get_current_room_context(meta: dict) -> dict:
+    current_room = meta.get("current_room", "mudai.places.start") if isinstance(meta, dict) else "mudai.places.start"
+    room_info = rooms.get_room_info(current_room)
+    return room_info or {"path": current_room, "tags": [], "purpose": "", "name": "Sala"}
+
+
+def _looks_like_question(message: str) -> bool:
+    text = (message or "").strip().lower()
+    if not text:
+        return False
+    if "?" in text:
+        return True
+    question_starts = (
+        "posso", "pode", "dá pra", "da pra", "será que", "sera que", "fica bom", "ficaria bom",
+        "o que acha", "acha que", "tem como", "consigo", "devo"
+    )
+    return text.startswith(question_starts)
+
+
+def _clean_implicit_contribution_text(message: str) -> str:
+    fragment = (message or "").strip()
+    cleanup_prefixes = [
+        "quero postar ", "vou postar ", "posta ", "publique ", "publica ",
+        "quero deixar ", "vou deixar ", "deixa ", "quero escrever ", "vou escrever ",
+        "escreve ", "escrever ", "quero compartilhar ", "vou compartilhar ", "compartilhar ",
+    ]
+    lowered = fragment.lower()
+    for prefix in cleanup_prefixes:
+        if lowered.startswith(prefix):
+            fragment = fragment[len(prefix):].strip()
+            lowered = fragment.lower()
+            break
+    return fragment.strip(" \n\t")
+
+
+def _looks_like_implicit_room_contribution(message: str, room_info: dict | None) -> bool:
+    text = (message or "").strip()
+    normalized = _normalize_phrase(text)
+    if not normalized or _looks_like_question(message):
+        return False
+    if normalized in {"olhar", "perfil", "salas", "explorar", "ajuda", "help", "sementes"}:
+        return False
+    if _infer_conversational_action(message, room_info=room_info):
+        return False
+
+    tags = [str(tag or "").lower() for tag in (room_info or {}).get("tags", [])]
+    purpose = str((room_info or {}).get("purpose", "") or "").lower()
+    line_count = len([line for line in text.splitlines() if line.strip()])
+    word_count = len(normalized.split())
+
+    poetic_room = any(tag in tags for tag in ["poesia", "escrita", "poema", "literatura"]) or any(term in purpose for term in ["poesia", "escrita", "verso", "poema"])
+    exchange_room = any(tag in tags for tag in ["troca", "conexão", "conexao", "networking"]) or any(term in purpose for term in ["troca", "conex", "networking"])
+
+    if poetic_room and (line_count >= 2 or word_count >= 6):
+        return True
+    if exchange_room and _contains_any(normalized, ["ofereço", "ofereco", "busco", "procuro", "troco", "posso ajudar", "preciso de", "quero encontrar"]):
+        return True
+    return False
+
+
+def _infer_contextual_conversational_action(message: str, meta: dict) -> dict | None:
+    room_info = _get_current_room_context(meta)
+    if _looks_like_decor_question(message):
+        fragment = _extract_decoration_fragment(message)
+        return {"action": "decorate_question", "target": fragment or message.strip()}
+    if _looks_like_implicit_room_contribution(message, room_info):
+        return {"action": "decorate", "target": _clean_implicit_contribution_text(message)}
+    return None
+
+
+def _infer_conversational_action(message: str, room_info: dict | None = None) -> dict | None:
     text = _normalize_phrase(message)
     if not text:
         return None
@@ -1067,8 +1150,33 @@ def _extract_decoration_fragment(message: str) -> str:
         "quero adicionar ",
         "quero colocar ",
         "quero botar ",
+        "posso adicionar ",
+        "posso colocar ",
+        "posso botar ",
+        "pode adicionar ",
+        "pode colocar ",
+        "pode botar ",
+        "dá para adicionar ",
+        "da para adicionar ",
+        "dá pra adicionar ",
+        "da pra adicionar ",
+        "dá para colocar ",
+        "da para colocar ",
+        "dá pra colocar ",
+        "da pra colocar ",
     ]
     for prefix in prefixes:
+        if lowered.startswith(prefix):
+            fragment = fragment[len(prefix):].strip()
+            lowered = fragment.lower()
+            break
+
+    question_prefixes = [
+        "será que dá para ", "sera que da para ", "será que dá pra ", "sera que da pra ",
+        "tem como adicionar ", "tem como colocar ", "fica bom colocar ", "ficaria bom colocar ",
+        "o que acha de colocar ", "acha que dá para colocar ",
+    ]
+    for prefix in question_prefixes:
         if lowered.startswith(prefix):
             fragment = fragment[len(prefix):].strip()
             lowered = fragment.lower()
@@ -1105,7 +1213,7 @@ def _extract_decoration_fragment(message: str) -> str:
     if normalized_fragment.startswith(("uma ", "um ", "umas ", "uns ")):
         fragment = fragment.split(" ", 1)[1].strip() if " " in fragment else fragment
 
-    fragment = fragment.strip(" .!\n\t")
+    fragment = fragment.strip(" .!?\n\t")
     return fragment
 
 
@@ -1134,6 +1242,20 @@ async def _handle_pending_action(phone: str, meta: dict, message: str) -> str | 
             profile_url=_generate_profile_url(phone),
         )
 
+    if pending_type == "decorate_idea":
+        normalized = _normalize_phrase(text)
+        if normalized in {"sim", "s", "pode", "pode sim", "manda", "pode adicionar", "pode postar", "ok", "isso", "faz isso"}:
+            fragment = str(pending.get("fragment", "") or "").strip()
+            if not fragment:
+                _update_meta(phone, {"pending_action": None})
+                return None
+            return await _handle_decorate(phone, {**meta, "pending_action": None}, f"decorar {fragment}")
+        fragment = str(pending.get("fragment", "") or "").strip()
+        if fragment:
+            return await _handle_decorate(phone, {**meta, "pending_action": None}, f"decorar {fragment} {text}".strip())
+        _update_meta(phone, {"pending_action": None})
+        return None
+
     if pending_type == "decorate":
         fragment = str(pending.get("fragment", "") or "").strip()
         if not fragment:
@@ -1143,6 +1265,34 @@ async def _handle_pending_action(phone: str, meta: dict, message: str) -> str | 
         return await _handle_decorate(phone, {**meta, "pending_action": None}, combined_message)
 
     return None
+
+
+def _handle_decor_question(phone: str, meta: dict, raw_fragment: str) -> str:
+    room_info = _get_current_room_context(meta)
+    fragment = _extract_decoration_fragment(raw_fragment)
+    fragment = fragment or _clean_implicit_contribution_text(raw_fragment)
+    _update_meta(phone, {"pending_action": {"type": "decorate_idea", "fragment": fragment}})
+    room_name = room_info.get("name", "Sala")
+    seeds = meta.get("seeds", 0)
+    narrative = (
+        f"Pode sim. Em *{room_name}*, isso pode virar uma contribuição persistida. "
+        f"Entendi a essência como: _{fragment or 'uma nova marca visual'}_. Se quiser, responda _sim_ para eu postar, ou detalhe melhor como você quer que isso apareça."
+    )
+    return fmt.format_interaction(
+        room_name=room_name,
+        action_label="Ideia de contribuição",
+        seeds=seeds,
+        seeds_change=0,
+        level=_calculate_level(meta),
+        narrative=narrative,
+        badge=None,
+        suggestions=[
+            {"cmd": "sim", "desc": "postar essa ideia"},
+            {"cmd": "com mais brilho e cor", "desc": "refinar a ideia"},
+        ],
+        breadcrumb=room_name.replace("🌱 ", ""),
+        profile_url=_generate_profile_url(phone),
+    )
 
 
 def _handle_referral(phone: str, target_phone: str) -> str:
@@ -1187,12 +1337,6 @@ def _handle_referral(phone: str, target_phone: str) -> str:
 
 async def _handle_chat(phone: str, meta: dict, message: str) -> str:
     """Handle general chat/conversation with AI context."""
-    active_challenge = meta.get("active_challenge")
-    if active_challenge:
-        resolution = _resolve_active_challenge(phone, meta, message, active_challenge)
-        if resolution:
-            return resolution
-
     current_room = meta.get("current_room", "mudai.places.start")
     room_info = rooms.get_room_info(current_room)
     nickname = meta.get("nickname", "Aventureiro")
@@ -1280,14 +1424,15 @@ async def _handle_chat(phone: str, meta: dict, message: str) -> str:
 
 # ─── AI Helpers ───────────────────────────────────────
 
-async def _parse_action(message: str) -> dict:
+async def _parse_action(message: str, meta: dict | None = None) -> dict:
     """Use AI to determine the player's intent."""
     msg = message.strip().lower()
 
-    if _looks_like_decor_question(message):
-        return {"action": "chat", "target": ""}
+    contextual = _infer_contextual_conversational_action(message, meta or {})
+    if contextual:
+        return contextual
 
-    inferred = _infer_conversational_action(message)
+    inferred = _infer_conversational_action(message, room_info=_get_current_room_context(meta or {}))
     if inferred:
         return inferred
 
