@@ -26,6 +26,7 @@ Sobre os artifacts base, o projeto agora mantém uma camada derivada para aproxi
 * Lidar com interações nas salas, onde o jogador quer colocar uma frase, pegar um item, deixar um conselho, etc (avaliado dinamicamente via IA).
 * Oferecer e resolver desafios contextuais por sala, usando o estado vivo da sala para gerar pequenas missões conversacionais com recompensa.
 * Persistir missões derivadas por sala como artifacts do mundo vivo, permitindo progresso por jogador e reuso da mesma missão ao longo do tempo.
+* Materializar novas salas dinamicamente quando uma saída conhecida aponta para um destino ainda não persistido, preservando o fluxo de exploração sem depender de seed manual prévia no banco.
 
 ### 3. AI Client Wrapper (`server/ai_client.py`)
 Cliente agnóstico usando `httpx` para interagir com a API da **OpenAI** e com um fallback inteligente para a **Google Gemini 2.0 Flash**.
@@ -46,6 +47,12 @@ Componente UI central para a interface via **WhatsApp**. A UI do WhatsApp só ac
 Como links para páginas extensas ajudam na visualização dos usuários (nem tudo cabe no WhatsApp), temos endpoints públicos (`/p/{token} `). 
 Eles mapeiam um artefato Markdown em HTML nativamente, usando `markdown2` e estilos de **Dark Mode / Glassmorphism** puros via CSS injetado e substituição dinâmica via expressões regulares para os campos do Profile `{nickname}`.
 Quando a navegação ocorre com sessão web ativa, o renderer também projeta o estado vivo da sala em componentes visuais próprios, incluindo painel de missões persistentes, status da missão ativa, progresso já concluído pelo jogador e sincronização parcial via HTMX para manter barras laterais e terminal coerentes após cada ação.
+
+### 7. Expansão Dinâmica do Mundo (`server/room_manager.py`)
+O backend consegue transformar saídas textuais em salas reais quando o jogador tenta atravessá-las e o destino ainda não existe como artifact.
+* **Materialização sob demanda:** ao seguir uma direção válida, o `room_manager` pode criar automaticamente `mudai.places.{slug}` com conteúdo mínimo, metadados e saída de retorno.
+* **Bootstrap imediato:** a nova sala já nasce com `world_state`, missões persistentes iniciais e tags derivadas do contexto de origem.
+* **Exploração contínua:** isso reduz dependência de seed manual e permite que o mapa cresça incrementalmente a partir das conexões já descritas nos markdowns das salas.
 
 ---
 

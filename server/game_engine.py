@@ -269,6 +269,8 @@ async def _handle_move(phone: str, meta: dict, target: str) -> str:
 
     # Try direction first
     target_path = rooms.find_room_by_direction(current_room, target)
+    if not target_path:
+        target_path = rooms.materialize_room_from_exit(current_room, target)
 
     # Try room name if direction didn't work
     if not target_path:

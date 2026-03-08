@@ -6,6 +6,7 @@ navigation, and room data enrichment.
 """
 
 from typing import Optional
+import re
 from . import database as db
 from . import message_formatter as fmt
 from . import world_state
@@ -180,6 +181,27 @@ def find_room_by_direction(current_room_path: str, direction: str) -> Optional[s
     return None
 
 
+def materialize_room_from_exit(current_room_path: str, direction: str) -> Optional[str]:
+    room = db.get_artifact(current_room_path)
+    if not room:
+        return None
+
+    exits = _extract_exits(room["content"])
+    direction_lower = _normalize_direction(direction)
+    for exit_info in exits:
+        if _normalize_direction(exit_info["direction"]) != direction_lower:
+            continue
+        target_name = exit_info["name"].strip()
+        if not target_name:
+            return None
+        existing = find_room_by_name(target_name)
+        if existing:
+            return existing
+        return _create_room_from_exit(current_room_path, direction_lower, target_name)
+
+    return None
+
+
 def move_player(phone: str, target_room: str) -> bool:
     """
     Move a player to a new room. Updates metadata.
@@ -318,6 +340,95 @@ def _extract_fragments(content: str) -> list[str]:
 
 def _clean_phone(phone: str) -> str:
     return "".join(c for c in phone if c.isalnum())
+
+
+def _normalize_direction(direction: str) -> str:
+    direction_map = {
+        "n": "norte", "s": "sul", "l": "leste", "o": "oeste",
+        "north": "norte", "south": "sul", "east": "leste", "west": "oeste",
+    }
+    direction_lower = direction.lower().strip()
+    return direction_map.get(direction_lower, direction_lower)
+
+
+def _reverse_direction(direction: str) -> str:
+    reverse_map = {
+        "norte": "sul",
+        "sul": "norte",
+        "leste": "oeste",
+        "oeste": "leste",
+    }
+    return reverse_map.get(_normalize_direction(direction), "voltar")
+
+
+def _slugify_room_name(name: str) -> str:
+    normalized = name.lower().strip()
+    normalized = normalized.replace("ç", "c")
+    normalized = normalized.replace("á", "a").replace("à", "a").replace("ã", "a").replace("â", "a")
+    normalized = normalized.replace("é", "e").replace("ê", "e")
+    normalized = normalized.replace("í", "i")
+    normalized = normalized.replace("ó", "o").replace("ô", "o").replace("õ", "o")
+    normalized = normalized.replace("ú", "u")
+    normalized = re.sub(r"[^a-z0-9]+", "_", normalized)
+    normalized = re.sub(r"_+", "_", normalized).strip("_")
+    return normalized or "sala_nova"
+
+
+def _create_room_from_exit(current_room_path: str, direction: str, target_name: str) -> str:
+    base_slug = _slugify_room_name(target_name)
+    room_path = f"mudai.places.{base_slug}"
+    suffix = 2
+    while db.get_artifact(room_path):
+        room_path = f"mudai.places.{base_slug}_{suffix}"
+        suffix += 1
+
+    source_room = db.get_artifact(current_room_path)
+    source_name = _extract_room_name(source_room["content"]) if source_room else "origem"
+    source_meta = source_room.get("metadata_parsed", {}) if source_room else {}
+    source_tags = source_meta.get("tags", [])
+    reverse_direction = _reverse_direction(direction)
+    purpose = f"Extensão de {source_name.replace('🌱 ', '').replace('📝 ', '')}".strip()
+    tags = list(dict.fromkeys([*source_tags[:2], "expansao", _normalize_direction(direction)]))
+    content = "\n".join([
+        f"# 🚪 {target_name}",
+        "",
+        f"> Um espaço recém-descoberto que se abre a partir de {source_name}.",
+        "",
+        "## Atmosfera",
+        f"Este lugar começou a ganhar forma quando alguém decidiu seguir para {direction}.",
+        "",
+        "## Saídas",
+        f"- **{reverse_direction}** → {source_name}",
+        "",
+        "## Fragmentos",
+        "_Seja a primeira pessoa a deixar uma marca aqui._",
+    ])
+    db.put_artifact(
+        path=room_path,
+        content=content,
+        metadata={
+            "emoji": "🚪",
+            "purpose": purpose,
+            "tags": tags,
+            "unlock_level": source_meta.get("unlock_level", 1),
+            "generated": True,
+            "generated_from_room": current_room_path,
+            "generated_from_direction": _normalize_direction(direction),
+        },
+    )
+    world_state.ensure_room_state(
+        room_path,
+        room_name=f"🚪 {target_name}",
+        purpose=purpose,
+        tags=tags,
+    )
+    world_state.ensure_room_missions(
+        room_path,
+        room_name=f"🚪 {target_name}",
+        purpose=purpose,
+        tags=tags,
+    )
+    return room_path
 
 
 def _calculate_relevance(player_interests: list[str], room_tags: list[str]) -> int:
