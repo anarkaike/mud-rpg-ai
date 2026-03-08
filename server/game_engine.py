@@ -315,6 +315,17 @@ async def _handle_move(phone: str, meta: dict, target: str) -> str:
         narrative = f"{narrative} {room_dynamic}".strip()
 
     seeds = meta.get("seeds", 0) + seeds_change
+    
+    # Add to room log if seeds were earned
+    if seeds_change > 0:
+        from datetime import datetime
+        time_str = datetime.now().strftime("%H:%M")
+        log_entry = {
+            "time": time_str,
+            "text": f'<span class="log-accent">{nickname}</span> cultivou <span class="player-seeds">+{seeds_change} sementes</span>.',
+            "type": "reward"
+        }
+        world_state._add_to_game_log(target_room_path, log_entry)
 
     response = fmt.format_room_view(
         room_name=room_info["name"],

@@ -130,8 +130,23 @@ def render_markdown_to_html(
             seeds = player_stats.get("seeds", 0)
             level = player_stats.get("level", 1)
             nickname = player_stats.get("nickname", "Viajante")
+            
+            # Add a script to trigger the animation if seeds changed
+            seeds_script = f"""
+            <script>
+                (function() {{
+                    const el = document.querySelector('#player-stats-bar .player-seeds');
+                    if (el && el.innerText.indexOf('{seeds}') === -1) {{
+                        el.classList.add('updated');
+                        setTimeout(() => el.classList.remove('updated'), 1000);
+                    }}
+                }})();
+            </script>
+            """
+
             player_bar_oob = f"""
             <div id="player-stats-bar" hx-swap-oob="true" class="player-stats-bar">
+                {seeds_script}
                 <div class="player-info">
                     <span class="player-nickname">👤 {nickname}</span>
                     <span class="player-level">⭐ Nv.{level}</span>
@@ -608,6 +623,11 @@ def _wrap_in_template(body_html: str, title: str, path: str, player_stats: Optio
             background: var(--accent-glow);
             border-left-color: var(--accent);
             animation: slideIn 0.3s ease-out;
+        }}
+
+        .log-entry.reward {{
+            background: rgba(16, 185, 129, 0.1);
+            border-left-color: var(--green);
         }}
 
         @keyframes slideIn {{
