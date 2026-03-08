@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from typing import Optional
 from fastapi.responses import HTMLResponse
 
-from ..game_engine import process_action
+from ..game_engine import process_action, _derive_player_tone_hints, _build_player_style_notes, _build_structured_profile_context
 from .. import database as db
 from .. import world_state
 from .. import room_manager as rooms
@@ -187,12 +187,30 @@ async def get_player_state(phone: str):
     meta = player.get("metadata_parsed", {})
     current_room_path = meta.get("current_room", "")
     room_info = rooms.get_room_info(current_room_path) if current_room_path else None
+    profile_signals = meta.get("profile_signals", {})
+    structured_profile = meta.get("structured_profile", {})
+    structured_profile_context = _build_structured_profile_context(meta)
+    style_notes = _build_player_style_notes(meta, profile_signals)
+    if structured_profile_context.get("communication_style"):
+        style_notes = f"{style_notes} Considere também: {structured_profile_context['communication_style']}."
 
     return {
         "phone": phone,
         "player": player,
         "active_challenge": meta.get("active_challenge"),
         "mission_progress": meta.get("mission_progress", {}),
+        "profile_signals": profile_signals,
+        "structured_profile": structured_profile,
+        "personalization_snapshot": {
+            "top_signals": profile_signals.get("top", []),
+            "tone_hints": _derive_player_tone_hints(meta, profile_signals),
+            "style_notes": style_notes,
+            "profile_summary": structured_profile_context.get("summary", ""),
+            "current_moment": structured_profile_context.get("current_moment", ""),
+            "communication_style": structured_profile_context.get("communication_style", ""),
+        },
+        "social_matches": rooms.find_social_matches(phone, limit=8),
+        "social_match_history": rooms.list_social_match_history(phone, limit=8),
         "current_room": room_info,
         "current_room_state": world_state.get_room_state(current_room_path) if current_room_path else None,
         "current_room_blocks": world_state.list_room_blocks(current_room_path, limit=8) if current_room_path else [],
@@ -203,6 +221,9 @@ async def get_player_state(phone: str):
                 "path": r["path"],
                 "name": rooms._extract_room_name(r.get("content", "")),
                 "tags": r.get("metadata_parsed", {}).get("tags", []),
+                "purpose": r.get("metadata_parsed", {}).get("purpose", ""),
+                "subtitle": rooms._extract_subtitle(r.get("content", "")),
+                "relevance": r.get("relevance", 0),
             }
             for r in rooms.get_rooms_for_player(phone)
         ],

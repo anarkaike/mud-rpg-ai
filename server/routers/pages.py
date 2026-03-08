@@ -163,6 +163,8 @@ def _build_player_state(artifact: dict) -> dict:
         "current_room": meta.get("current_room", ""),
         "active_challenge": meta.get("active_challenge"),
         "mission_progress": meta.get("mission_progress", {}),
+        "profile_signals": meta.get("profile_signals", {}),
+        "structured_profile": meta.get("structured_profile", {}),
     }
 
 

@@ -6,6 +6,7 @@ badges, and referral system.
 """
 
 import hashlib
+import re
 from . import database as db
 from . import message_formatter as fmt
 from . import room_manager as rooms
@@ -24,9 +25,27 @@ Dada a mensagem do jogador, determine a INTENÇÃO numa dessas categorias:
 - "profile" — jogador quer ver seu perfil
 - "explore" — jogador quer ver lista de salas disponíveis
 - "decorate" — jogador quer deixar uma marca/fragmento na sala
+- "matches" — jogador quer ver conexões sugeridas
+- "social_mutual" — jogador quer ver conexões mútuas/recíprocas
+- "social_confirmed" — jogador quer ver conexões confirmadas
+- "confirm_social_match" — jogador quer confirmar uma conexão específica
+- "social_useful" — jogador quer ver conexões úteis
+- "mark_social_useful" — jogador quer marcar uma conexão como útil
+- "social_favorites" — jogador quer ver conexões favoritas
+- "favorite_social_match" — jogador quer favoritar uma conexão
+- "social_history" — jogador quer ver memória/histórico de conexões
+- "social_note" — jogador quer anotar uma nota privada em uma conexão
+- "social_tags" — jogador quer salvar tags em uma conexão
 - "help" — jogador pede ajuda
 - "seeds" — jogador pergunta sobre sementes, moedas, pontos, como ganhar
+- "referral" — jogador quer indicar/convidar alguém
+- "reset" — jogador quer apagar o progresso e recomeçar
 - "chat" — qualquer outra interação conversacional
+
+REGRAS CRÍTICAS:
+- Só classifique como "decorate" quando o jogador estiver DE FATO deixando uma marca, descrevendo algo para ser adicionado, ou dando uma instrução decorativa direta.
+- Se a mensagem for pergunta, dúvida, pedido de opinião, pedido de permissão ou conversa sobre decorar, classifique como "chat".
+- Exemplos que DEVEM ser "chat": "posso colocar uma árvore no meio da recepção?", "fica bom botar flores aqui?", "o que acha de decorar com velas?"
 
 Responda APENAS com JSON:
 {"action": "<tipo>", "target": "<alvo se houver>"}
@@ -38,10 +57,23 @@ Exemplos:
 - "perfil" → {"action": "profile", "target": ""}
 - "salas" → {"action": "explore", "target": ""}
 - "quero decorar essa sala" → {"action": "decorate", "target": ""}
+- "adicione uma árvore no meio da recepção" → {"action": "decorate", "target": "adicione uma árvore no meio da recepção"}
+- "mostre minhas conexões" → {"action": "matches", "target": ""}
+- "quero ver minhas conexões mútuas" → {"action": "social_mutual", "target": ""}
+- "me mostra minhas conexões confirmadas" → {"action": "social_confirmed", "target": ""}
+- "confirma minha conexão com Ana" → {"action": "confirm_social_match", "target": "Ana"}
+- "marque Bruno como conexão útil" → {"action": "mark_social_useful", "target": "Bruno"}
+- "me mostra minhas favoritas" → {"action": "social_favorites", "target": ""}
+- "favorite Carlos" → {"action": "favorite_social_match", "target": "Carlos"}
+- "quero ver meu histórico de conexões" → {"action": "social_history", "target": ""}
+- "anote na conexão Ana :: founder de healthtech" → {"action": "social_note", "target": "Ana :: founder de healthtech"}
+- "etiquete Bruno :: investidor, produto" → {"action": "social_tags", "target": "Bruno :: investidor, produto"}
 - "ajuda" → {"action": "help", "target": ""}
 - "como ganho sementes?" → {"action": "seeds", "target": ""}
 - "o que são sementes?" → {"action": "seeds", "target": ""}
 - "quantas sementes tenho?" → {"action": "seeds", "target": ""}
+- "quero indicar +5511999999999" → {"action": "referral", "target": "+5511999999999"}
+- "quero recomeçar do zero" → {"action": "reset", "target": ""}
 - "Que lugar bonito!" → {"action": "chat", "target": ""}
 - "norte" → {"action": "move", "target": "norte"}
 - "n" → {"action": "move", "target": "norte"}
@@ -120,6 +152,9 @@ SEEDS_REWARDS = {
     "onboarding_complete": 3,
     "referral": 5,
     "first_look": 1,
+    "relationship_milestone": 1,
+    "relationship_confirmed": 2,
+    "relationship_mutual": 3,
 }
 
 SEEDS_COSTS = {
@@ -137,6 +172,9 @@ BADGES = {
     "conector": {"emoji": "🤝", "name": "Conector", "desc": "Fez 1+ indicação"},
     "veterano": {"emoji": "💎", "name": "Veterano", "desc": "Chegou ao nível 5"},
     "social": {"emoji": "💬", "name": "Social", "desc": "Conversou 20+ vezes"},
+    "curador_social": {"emoji": "🏷", "name": "Curador Social", "desc": "Enriqueceu sua memória social com notas, tags e curadoria"},
+    "aliado": {"emoji": "🪢", "name": "Aliado", "desc": "Confirmou vínculos sociais reais"},
+    "elo_mutuo": {"emoji": "🫂", "name": "Elo Mútuo", "desc": "Alcançou uma conexão recíproca"},
 }
 
 
@@ -183,6 +221,8 @@ async def process_action(phone: str, message: str) -> str:
                 return await _handle_look(phone, meta)
             case "profile":
                 return _handle_profile(phone, meta)
+            case "reset":
+                return _handle_reset(phone)
             case "social_mutual":
                 return _handle_mutual_social_matches(phone, meta)
             case "social_confirmed":
@@ -199,6 +239,10 @@ async def process_action(phone: str, message: str) -> str:
                 return _handle_favorite_social_match(phone, meta, target)
             case "social_history":
                 return _handle_social_match_history(phone, meta)
+            case "social_note":
+                return _handle_social_match_note(phone, meta, target)
+            case "social_tags":
+                return _handle_social_match_tags(phone, meta, target)
             case "matches":
                 return _handle_social_matches(phone, meta)
             case "explore":
@@ -209,6 +253,8 @@ async def process_action(phone: str, message: str) -> str:
                 return _handle_help()
             case "seeds":
                 return _handle_seeds(phone, meta)
+            case "referral":
+                return _handle_referral(phone, target)
             case _:
                 return await _handle_chat(phone, meta, message)
     except Exception as e:
@@ -247,6 +293,18 @@ async def _handle_slash_command(phone: str, msg: str) -> str:
             if not player:
                 return fmt.format_error("Você ainda não tem perfil. Envie 'oi' para começar!")
             return _handle_confirm_social_match(phone, player.get("metadata_parsed", {}), args)
+        case "/anotar-conexao" | "/anotar-conexão":
+            clean = _clean_phone(phone)
+            player = db.get_artifact(f"mudai.users.{clean}")
+            if not player:
+                return fmt.format_error("Você ainda não tem perfil. Envie 'oi' para começar!")
+            return _handle_social_match_note(phone, player.get("metadata_parsed", {}), args)
+        case "/taguear-conexao" | "/taguear-conexão" | "/etiquetar-conexao" | "/etiquetar-conexão":
+            clean = _clean_phone(phone)
+            player = db.get_artifact(f"mudai.users.{clean}")
+            if not player:
+                return fmt.format_error("Você ainda não tem perfil. Envie 'oi' para começar!")
+            return _handle_social_match_tags(phone, player.get("metadata_parsed", {}), args)
         case "/conexoes-uteis" | "/conexões-úteis" | "/uteis-sociais" | "/úteis-sociais":
             clean = _clean_phone(phone)
             player = db.get_artifact(f"mudai.users.{clean}")
@@ -311,6 +369,8 @@ async def _handle_slash_command(phone: str, msg: str) -> str:
                 "  /conexoes — ver conexões sugeridas\n"
                 "  /conexoes-mutuas — ver vínculos recíprocos\n"
                 "  /confirmar-conexao NOME — confirmar vínculo\n"
+                "  /anotar-conexao NOME :: NOTA — salvar nota privada\n"
+                "  /taguear-conexao NOME :: tag1,tag2 — salvar tags\n"
                 "  /conexoes-confirmadas — ver confirmadas\n"
                 "  /marcar-conexao-util NOME — salvar conexão útil\n"
                 "  /conexoes-uteis — ver úteis\n"
@@ -580,13 +640,49 @@ def _handle_mutual_social_matches(phone: str, meta: dict) -> str:
     return fmt.format_mutual_social_matches(mutual, profile_url=_generate_profile_url(phone))
 
 
+def _split_social_memory_payload(raw_args: str) -> tuple[str, str]:
+    if "::" not in (raw_args or ""):
+        return "", ""
+    query, payload = raw_args.split("::", 1)
+    return query.strip(), payload.strip()
+
+
 def _handle_confirm_social_match(phone: str, meta: dict, target: str) -> str:
     if not (target or "").strip():
         return fmt.format_error("Use /confirmar-conexao NOME para marcar alguém da sua memória social como vínculo real.")
     saved = rooms.confirm_social_match(phone, target)
     if not saved:
         return fmt.format_error("Não encontrei essa conexão na sua memória social. Veja /historico-conexoes primeiro.")
+    _apply_relationship_progress(phone, "confirm", saved)
+    if saved.get("is_mutual") and str(saved.get("other_phone", "") or "").strip():
+        _apply_relationship_progress(str(saved.get("other_phone", "")), "mutual", {
+            "nickname": meta.get("nickname", "Viajante"),
+            "other_phone": _clean_phone(phone),
+            "is_mutual": True,
+        })
     return fmt.format_social_confirmed_saved(saved, profile_url=_generate_profile_url(phone))
+
+
+def _handle_social_match_note(phone: str, meta: dict, raw_args: str) -> str:
+    target, note = _split_social_memory_payload(raw_args)
+    if not target or not note:
+        return fmt.format_error("Use /anotar-conexao NOME :: SUA NOTA para registrar uma nota privada.")
+    saved = rooms.save_social_match_private_note(phone, target, note)
+    if not saved:
+        return fmt.format_error("Não encontrei essa conexão na sua memória social. Veja /historico-conexoes primeiro.")
+    _apply_relationship_progress(phone, "note", saved)
+    return fmt.format_social_note_saved(saved, profile_url=_generate_profile_url(phone))
+
+
+def _handle_social_match_tags(phone: str, meta: dict, raw_args: str) -> str:
+    target, tags = _split_social_memory_payload(raw_args)
+    if not target or not tags:
+        return fmt.format_error("Use /taguear-conexao NOME :: tag1, tag2 para atualizar tags manuais.")
+    saved = rooms.save_social_match_tags(phone, target, tags)
+    if not saved:
+        return fmt.format_error("Não encontrei essa conexão na sua memória social. Veja /historico-conexoes primeiro.")
+    _apply_relationship_progress(phone, "tags", saved)
+    return fmt.format_social_tags_saved(saved, profile_url=_generate_profile_url(phone))
 
 
 def _handle_confirmed_social_matches(phone: str, meta: dict) -> str:
@@ -600,6 +696,7 @@ def _handle_mark_social_match_useful(phone: str, meta: dict, target: str) -> str
     saved = rooms.mark_social_match_useful(phone, target)
     if not saved:
         return fmt.format_error("Não encontrei essa conexão na sua memória social. Veja /historico-conexoes primeiro.")
+    _apply_relationship_progress(phone, "useful", saved)
     return fmt.format_social_useful_saved(saved, profile_url=_generate_profile_url(phone))
 
 
@@ -614,6 +711,7 @@ def _handle_favorite_social_match(phone: str, meta: dict, target: str) -> str:
     saved = rooms.favorite_social_match(phone, target)
     if not saved:
         return fmt.format_error("Não encontrei essa conexão na sua memória social. Veja /historico-conexoes primeiro.")
+    _apply_relationship_progress(phone, "favorite", saved)
     return fmt.format_social_favorite_saved(saved, profile_url=_generate_profile_url(phone))
 
 
@@ -643,6 +741,9 @@ def _handle_explore(phone: str, meta: dict) -> str:
 
 async def _handle_decorate(phone: str, meta: dict, message: str) -> str:
     """Add a fragment to the current room."""
+    if _looks_like_decor_question(message):
+        return await _handle_chat(phone, meta, message)
+
     seeds = meta.get("seeds", 0)
     if seeds < SEEDS_COSTS["decorate"]:
         return fmt.format_error(
@@ -650,15 +751,27 @@ async def _handle_decorate(phone: str, meta: dict, message: str) -> str:
             "Diga _\"/sementes\"_ para ver como ganhar mais!"
         )
 
-    current_room = meta.get("current_room", "mudai.places.start")
+    current_room, needs_room_clarification = _resolve_decoration_room(meta, message)
     nickname = meta.get("nickname", "Alguém")
 
-    # Use the message itself as the fragment
-    fragment = message.strip()
-    for prefix in ["decorar ", "decorar:", "decoração ", "quero decorar "]:
-        if fragment.lower().startswith(prefix):
-            fragment = fragment[len(prefix):].strip()
-            break
+    fragment = _extract_decoration_fragment(message)
+
+    if needs_room_clarification:
+        room_info = rooms.get_room_info(meta.get("current_room", "mudai.places.start"))
+        return fmt.format_interaction(
+            room_name=room_info["name"] if room_info else "Sala",
+            action_label="Decorar",
+            seeds=seeds,
+            seeds_change=0,
+            level=_calculate_level(meta),
+            narrative=f"Entendi o que você quer adicionar: _{fragment or 'esse elemento'}_. Em qual sala você quer colocar isso? Pode dizer, por exemplo, _na recepção_ ou _na sala atual_.",
+            badge=None,
+            suggestions=[
+                {"cmd": "na recepção", "desc": "colocar lá"},
+                {"cmd": "na sala atual", "desc": "usar a sala onde você está"},
+            ],
+            profile_url=_generate_profile_url(phone),
+        )
 
     if len(fragment) < 3:
         room_info = rooms.get_room_info(current_room)
@@ -777,6 +890,217 @@ def _handle_seeds(phone: str, meta: dict) -> str:
         "💬 _Cada interação vale! Explore e ganhe._",
         fmt.SEP,
     ])
+
+
+def _looks_like_decor_question(message: str) -> bool:
+    text = (message or "").strip().lower()
+    if not text:
+        return False
+    question_signals = [
+        "?",
+        "posso ",
+        "poderia ",
+        "da para ",
+        "dá para ",
+        "sera que",
+        "será que",
+        "fica bom",
+        "o que acha",
+        "acha que",
+        "tem como",
+    ]
+    decor_signals = [
+        "arvore", "árvore", "flor", "flores", "planta", "jardim", "vela", "velas",
+        "quadro", "mural", "sofá", "sofa", "mesa", "recepção", "recepcao", "decor",
+        "colocar", "botar", "por ",
+    ]
+    return any(signal in text for signal in question_signals) and any(signal in text for signal in decor_signals)
+
+
+def _contains_any(text: str, options: list[str]) -> bool:
+    return any(option in text for option in options)
+
+
+def _normalize_phrase(text: str) -> str:
+    cleaned = re.sub(r"[^a-zA-ZÀ-ÿ0-9\s]", " ", text or "")
+    return re.sub(r"\s+", " ", cleaned).strip().lower()
+
+
+def _extract_phone_candidate(text: str) -> str:
+    match = re.search(r"\+?\d[\d\s().-]{8,}\d", text or "")
+    if not match:
+        return ""
+    candidate = re.sub(r"[^\d+]", "", match.group(0))
+    return candidate if len(re.sub(r"\D", "", candidate)) >= 10 else ""
+
+
+def _extract_target_after_phrase(message: str, phrases: list[str]) -> str:
+    lowered = (message or "").lower()
+    for phrase in phrases:
+        index = lowered.find(phrase)
+        if index >= 0:
+            extracted = message[index + len(phrase):].strip(" :-\n\t")
+            if extracted:
+                return extracted
+    return ""
+
+
+def _looks_like_direct_decoration_intent(message: str) -> bool:
+    text = (message or "").strip().lower()
+    if not text or _looks_like_decor_question(message):
+        return False
+    imperative_starts = (
+        "decorar", "decoração", "adicione", "adiciona", "adicionar", "coloque", "coloca",
+        "botar", "bota", "ponha", "põe", "por ", "crie ", "criar ", "quero adicionar",
+        "quero colocar", "quero botar", "quero pôr", "quero por"
+    )
+    decor_terms = (
+        "árvore", "arvore", "flor", "flores", "planta", "jardim", "vela", "velas", "quadro",
+        "mural", "mesa", "sofá", "sofa", "objeto", "decoração", "decoracao", "estatuta", "estátua"
+    )
+    return text.startswith(imperative_starts) or (_contains_any(text, list(decor_terms)) and _contains_any(text, ["adicion", "coloc", "bot", "decor", "ponh", "por "]))
+
+
+def _infer_conversational_action(message: str) -> dict | None:
+    text = _normalize_phrase(message)
+    if not text:
+        return None
+
+    if _contains_any(text, ["recomecar do zero", "recomecar do zero", "resetar meu perfil", "apagar meu progresso", "zerar meu progresso"]):
+        return {"action": "reset", "target": ""}
+    if _looks_like_direct_decoration_intent(message):
+        return {"action": "decorate", "target": message.strip()}
+    if _contains_any(text, ["me ajuda", "preciso de ajuda", "como funciona", "quais comandos", "o que posso fazer", "o que da pra fazer", "o que dá pra fazer"]):
+        return {"action": "help", "target": ""}
+    if _contains_any(text, ["meu perfil", "mostrar perfil", "mostra meu perfil", "quem sou eu", "meu personagem"]):
+        return {"action": "profile", "target": ""}
+    if _contains_any(text, ["quais salas", "mostrar salas", "mostra as salas", "para onde posso ir", "onde posso ir", "explorar salas", "lista de salas"]):
+        return {"action": "explore", "target": ""}
+    if _contains_any(text, ["quantas sementes", "meu saldo", "saldo de sementes", "como ganho sementes", "como ganhar sementes", "o que sao sementes", "o que são sementes"]):
+        return {"action": "seeds", "target": ""}
+    if _contains_any(text, ["conexoes mutuas", "conexões mútuas", "conexoes reciprocas", "conexões recíprocas", "conexoes reciprocas"]):
+        return {"action": "social_mutual", "target": ""}
+    if _contains_any(text, ["conexoes confirmadas", "conexões confirmadas", "vinculos confirmados", "vínculos confirmados"]):
+        return {"action": "social_confirmed", "target": ""}
+    if _contains_any(text, ["conexoes uteis", "conexões úteis", "conexoes úteis", "pessoas uteis", "pessoas úteis"]):
+        return {"action": "social_useful", "target": ""}
+    if _contains_any(text, ["conexoes favoritas", "conexões favoritas", "favoritas", "favoritos de conexao", "favoritos de conexão"]):
+        return {"action": "social_favorites", "target": ""}
+    if _contains_any(text, ["historico de conex", "histórico de conex", "memoria social", "memória social"]):
+        return {"action": "social_history", "target": ""}
+    if _contains_any(text, ["minhas conexoes", "minhas conexões", "quem combina comigo", "pessoas compativeis", "pessoas compatíveis", "com quem posso falar"]):
+        return {"action": "matches", "target": ""}
+
+    confirm_target = _extract_target_after_phrase(message, ["confirmar conexão com ", "confirma minha conexão com ", "confirma conexão com "])
+    if confirm_target:
+        return {"action": "confirm_social_match", "target": confirm_target}
+
+    useful_target = _extract_target_after_phrase(message, ["marque ", "marca "])
+    if useful_target and _contains_any(text, ["como util", "como útil", "conexao util", "conexão útil"]):
+        cleaned = re.sub(r"\s+como\s+conex[aã]o\s+[uú]til.*$", "", useful_target, flags=re.IGNORECASE).strip()
+        cleaned = re.sub(r"\s+como\s+[uú]til.*$", "", cleaned, flags=re.IGNORECASE).strip()
+        return {"action": "mark_social_useful", "target": cleaned}
+
+    favorite_target = _extract_target_after_phrase(message, ["favorite ", "favoritar ", "favorita "])
+    if favorite_target:
+        return {"action": "favorite_social_match", "target": favorite_target}
+
+    note_target = _extract_target_after_phrase(message, ["anote na conexão ", "anota na conexão ", "anotar conexão ", "salve uma nota para "])
+    if note_target and "::" in note_target:
+        return {"action": "social_note", "target": note_target}
+
+    tag_target = _extract_target_after_phrase(message, ["etiquete ", "tagueie ", "taguear "])
+    if tag_target and "::" in tag_target:
+        return {"action": "social_tags", "target": tag_target}
+
+    phone_candidate = _extract_phone_candidate(message)
+    if phone_candidate and _contains_any(text, ["indicar", "indique", "convidar", "convide", "chamar para", "trazer para"]):
+        return {"action": "referral", "target": phone_candidate}
+
+    return None
+
+
+def _resolve_decoration_room(meta: dict, message: str) -> tuple[str | None, bool]:
+    current_room = meta.get("current_room", "mudai.places.start")
+    text = _normalize_phrase(message)
+    if _contains_any(text, ["nessa sala", "nesta sala", "na sala", "sala atual", "aqui", "neste lugar", "nesse lugar"]):
+        return current_room, False
+
+    all_rooms = db.list_by_prefix("mudai.places.", direct_children_only=True)
+    for room in all_rooms:
+        room_name = rooms._extract_room_name(room.get("content", ""))
+        normalized_room_name = _normalize_phrase(room_name)
+        if normalized_room_name and normalized_room_name in text:
+            return room["path"], False
+
+    if _looks_like_direct_decoration_intent(message) and not (message or "").strip().lower().startswith("decorar"):
+        return None, True
+    return current_room, False
+
+
+def _extract_decoration_fragment(message: str) -> str:
+    fragment = (message or "").strip()
+    lowered = fragment.lower()
+    prefixes = [
+        "decorar ",
+        "decorar:",
+        "decoração ",
+        "quero decorar ",
+        "vou decorar ",
+        "adicionar ",
+        "adicione ",
+        "adiciona ",
+        "colocar ",
+        "coloque ",
+        "coloca ",
+        "botar ",
+        "bota ",
+        "ponha ",
+        "põe ",
+        "por ",
+        "quero adicionar ",
+        "quero colocar ",
+        "quero botar ",
+    ]
+    for prefix in prefixes:
+        if lowered.startswith(prefix):
+            fragment = fragment[len(prefix):].strip()
+            lowered = fragment.lower()
+            break
+
+    cleanup_prefixes = [
+        "uma ", "um ", "umas ", "uns ", "a ", "o ",
+    ]
+    if any(lowered.startswith(prefix) for prefix in ["colocar ", "botar ", "por "]):
+        for prefix in cleanup_prefixes:
+            if lowered.startswith(prefix):
+                fragment = fragment[len(prefix):].strip()
+                lowered = fragment.lower()
+                break
+
+    location_markers = [
+        " no meio da ", " no meio do ", " no centro da ", " no centro do ",
+        " na ", " no ", " em ", " aqui",
+    ]
+    normalized_fragment = _normalize_phrase(fragment)
+    all_rooms = db.list_by_prefix("mudai.places.", direct_children_only=True)
+    known_room_names = [_normalize_phrase(rooms._extract_room_name(room.get("content", ""))) for room in all_rooms]
+    for marker in location_markers:
+        index = lowered.rfind(marker)
+        if index <= 0:
+            continue
+        tail = _normalize_phrase(fragment[index + len(marker):])
+        if tail in {"sala", "sala atual", "recepcao", "recepção", "aqui", "lugar"} or tail in known_room_names:
+            fragment = fragment[:index].strip()
+            lowered = fragment.lower()
+            normalized_fragment = _normalize_phrase(fragment)
+            break
+
+    if normalized_fragment.startswith(("uma ", "um ", "umas ", "uns ")):
+        fragment = fragment.split(" ", 1)[1].strip() if " " in fragment else fragment
+
+    fragment = fragment.strip(" .!\n\t")
+    return fragment
 
 
 def _handle_referral(phone: str, target_phone: str) -> str:
@@ -918,6 +1242,13 @@ async def _parse_action(message: str) -> dict:
     """Use AI to determine the player's intent."""
     msg = message.strip().lower()
 
+    if _looks_like_decor_question(message):
+        return {"action": "chat", "target": ""}
+
+    inferred = _infer_conversational_action(message)
+    if inferred:
+        return inferred
+
     # Fast-path common commands (no AI needed)
     fast_map = {
         "olhar": {"action": "look", "target": ""},
@@ -964,7 +1295,7 @@ async def _parse_action(message: str) -> dict:
         return fast_map[msg]
 
     # Check decorar prefix
-    if msg.startswith("decorar"):
+    if msg.startswith("decorar") and not _looks_like_decor_question(message):
         return {"action": "decorate", "target": msg}
 
     # Check seeds-related keywords
@@ -1040,6 +1371,64 @@ def _award_seeds(phone: str, amount: int):
     meta["seeds"] = meta.get("seeds", 0) + amount
     meta["total_seeds_earned"] = meta.get("total_seeds_earned", 0) + amount
     _update_meta(phone, meta)
+
+
+def _apply_relationship_progress(phone: str, event_type: str, saved_meta: dict | None = None):
+    clean = _clean_phone(phone)
+    player = db.get_artifact(f"mudai.users.{clean}")
+    if not player:
+        return
+
+    meta = player.get("metadata_parsed", {})
+    progress = meta.get("relationship_progress", {}) if isinstance(meta.get("relationship_progress", {}), dict) else {}
+    unlocked = set(progress.get("unlocked_milestones", [])) if isinstance(progress.get("unlocked_milestones", []), list) else set()
+    stats = rooms.get_social_relationship_progress(phone)
+
+    milestone_specs = [
+        ("first_favorite", stats.get("favorites", 0) >= 1, SEEDS_REWARDS["relationship_milestone"], None),
+        ("first_useful", stats.get("useful", 0) >= 1, SEEDS_REWARDS["relationship_milestone"], None),
+        ("first_note", stats.get("noted", 0) >= 1, SEEDS_REWARDS["relationship_milestone"], None),
+        ("first_tags", stats.get("tagged", 0) >= 1, SEEDS_REWARDS["relationship_milestone"], "curador_social"),
+        ("first_confirmed", stats.get("confirmed", 0) >= 1, SEEDS_REWARDS["relationship_confirmed"], "aliado"),
+        ("first_mutual", stats.get("mutual", 0) >= 1, SEEDS_REWARDS["relationship_mutual"], "elo_mutuo"),
+        ("curation_set", (stats.get("favorites", 0) + stats.get("useful", 0) + stats.get("noted", 0) + stats.get("tagged", 0)) >= 4, SEEDS_REWARDS["relationship_milestone"], "curador_social"),
+    ]
+
+    earned_any = False
+    for milestone_id, achieved, seeds_reward, badge_id in milestone_specs:
+        if not achieved or milestone_id in unlocked:
+            continue
+        unlocked.add(milestone_id)
+        if seeds_reward > 0:
+            _award_seeds(phone, seeds_reward)
+        if badge_id:
+            _check_and_award_badge(phone, badge_id)
+        earned_any = True
+
+    latest_meta = db.get_artifact(f"mudai.users.{clean}")
+    latest_progress = latest_meta.get("metadata_parsed", {}).get("relationship_progress", {}) if latest_meta else {}
+    merged_progress = latest_progress if isinstance(latest_progress, dict) else {}
+    merged_progress.update({
+        "stats": stats,
+        "last_event_type": event_type,
+        "last_event_target": str((saved_meta or {}).get("nickname", "") or ""),
+        "unlocked_milestones": sorted(unlocked),
+        "updated_at": db._now(),
+    })
+    if earned_any:
+        merged_progress["last_rewarded_at"] = db._now()
+    _update_meta(phone, {"relationship_progress": merged_progress})
+    current_room = str(meta.get("current_room", "") or "").strip()
+    if current_room and event_type in {"confirm", "mutual", "note", "tags", "favorite", "useful"}:
+        nickname = meta.get("nickname", "Viajante")
+        target_name = str((saved_meta or {}).get("nickname", "") or "alguém")
+        world_state.apply_room_consequence(
+            room_path=current_room,
+            consequence_type=f"social_{event_type}",
+            summary=f"{nickname} aprofundou um vínculo com {target_name} nesta sala.",
+            intensity=2 if event_type in {"confirm", "mutual"} else 1,
+            social_delta=2 if event_type in {"confirm", "mutual"} else 1,
+        )
 
 
 def _calculate_level(meta: dict) -> int:
@@ -1338,12 +1727,21 @@ def _build_room_dynamic_suffix(room_info: dict | None) -> str:
     motifs = room_info.get("motifs", [])[:3]
     highlight = room_info.get("recent_contributions", [])[:1]
     parts = []
+    consequence = str(room_info.get("last_consequence_summary", "") or "").strip()
+    if consequence:
+        parts.append(f"Consequência recente: {consequence}")
     if motifs:
         parts.append(f"O clima recente gira em torno de {', '.join(motifs)}.")
     if highlight:
         excerpt = highlight[0].get("excerpt", "")
         if excerpt:
             parts.append(f"Um eco recente ficou no ar: _{excerpt}_")
+    momentum = int(room_info.get("momentum_score", 0) or 0)
+    social_heat = int(room_info.get("social_heat", 0) or 0)
+    if momentum >= 3:
+        parts.append(f"O lugar está ganhando tração coletiva ({momentum}).")
+    if social_heat >= 2:
+        parts.append(f"Existe uma temperatura social viva aqui ({social_heat}).")
     image = room_info.get("image")
     if image and image.get("status") == "pending_generation":
         parts.append("A sala está juntando detalhes para ganhar uma nova imagem.")

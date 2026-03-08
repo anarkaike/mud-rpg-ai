@@ -273,6 +273,12 @@ def format_social_matches(matches: list[dict], profile_url: str = "") -> str:
             lines.append(f"     _afinidades:_ {', '.join(shared_signals)}")
         if complementary_signals:
             lines.append(f"     _te complementa em:_ {', '.join(complementary_signals)}")
+        tags = match.get("manual_tags", [])[:4]
+        note = str(match.get("private_note", "") or "").strip()
+        if tags:
+            lines.append(f"     _tags:_ {', '.join(tags)}")
+        if note:
+            lines.append(f"     _nota:_ {note[:120]}")
 
     if not lines:
         lines.append("  ▸ Ainda não achei conexões fortes com base no seu perfil.")
@@ -386,6 +392,12 @@ def format_social_match_history(history: list[dict], profile_url: str = "") -> s
             lines.append(f"     _afinidades:_ {', '.join(shared_signals)}")
         if complementary_signals:
             lines.append(f"     _te complementa em:_ {', '.join(complementary_signals)}")
+        tags = item.get("manual_tags", [])[:4]
+        note = str(item.get("private_note", "") or "").strip()
+        if tags:
+            lines.append(f"     _tags:_ {', '.join(tags)}")
+        if note:
+            lines.append(f"     _nota:_ {note[:120]}")
 
     if not lines:
         lines.append("  ▸ Você ainda não tem histórico de conexões persistido.")
@@ -461,6 +473,47 @@ def format_social_confirmed_saved(match_meta: dict, profile_url: str = "") -> st
     return "\n".join(parts)
 
 
+def format_social_note_saved(match_meta: dict, profile_url: str = "") -> str:
+    nickname = match_meta.get("nickname", "Viajante")
+    note = str(match_meta.get("private_note", "") or "").strip()
+    parts = [
+        SEP,
+        "📝 *NOTA SOCIAL SALVA*",
+        SEP,
+        "",
+        f"Você registrou uma nota privada sobre *{nickname}*.",
+        "",
+        f"_{note[:180]}_" if note else "_Sem conteúdo de nota._",
+        "",
+        "💬 _Use /historico-conexoes para revisar sua memória social enriquecida._",
+    ]
+    if profile_url:
+        parts.append(f"\n🔗 {profile_url}")
+    parts.append(SEP)
+    return "\n".join(parts)
+
+
+def format_social_tags_saved(match_meta: dict, profile_url: str = "") -> str:
+    nickname = match_meta.get("nickname", "Viajante")
+    tags = match_meta.get("manual_tags", [])[:8]
+    tags_text = ", ".join(tags) if tags else "sem tags"
+    parts = [
+        SEP,
+        "🏷 *TAGS SOCIAIS SALVAS*",
+        SEP,
+        "",
+        f"Você atualizou as tags manuais de *{nickname}*.",
+        "",
+        f"_{tags_text}_",
+        "",
+        "💬 _Essas tags passam a viver na sua memória social persistida._",
+    ]
+    if profile_url:
+        parts.append(f"\n🔗 {profile_url}")
+    parts.append(SEP)
+    return "\n".join(parts)
+
+
 def format_favorite_social_matches(history: list[dict], profile_url: str = "") -> str:
     lines = []
     for item in history[:8]:
@@ -471,6 +524,9 @@ def format_favorite_social_matches(history: list[dict], profile_url: str = "") -
             f"  ▸ *{item.get('nickname', 'Viajante')}* · score {item.get('score', 0)} · vista {item.get('seen_count', 0)}x"
         )
         lines.append(f"     _{room_hint}_")
+        tags = item.get("manual_tags", [])[:4]
+        if tags:
+            lines.append(f"     _tags:_ {', '.join(tags)}")
 
     if not lines:
         lines.append("  ▸ Você ainda não marcou conexões favoritas.")
@@ -501,6 +557,9 @@ def format_useful_social_matches(history: list[dict], profile_url: str = "") -> 
             f"  ▸ *{item.get('nickname', 'Viajante')}* · score {item.get('score', 0)} · vista {item.get('seen_count', 0)}x"
         )
         lines.append(f"     _{room_hint}_")
+        tags = item.get("manual_tags", [])[:4]
+        if tags:
+            lines.append(f"     _tags:_ {', '.join(tags)}")
 
     if not lines:
         lines.append("  ▸ Você ainda não marcou conexões úteis.")
@@ -532,6 +591,12 @@ def format_confirmed_social_matches(history: list[dict], profile_url: str = "") 
             f"  ▸ *{item.get('nickname', 'Viajante')}*{mutual_hint} · score {item.get('score', 0)} · vista {item.get('seen_count', 0)}x"
         )
         lines.append(f"     _{room_hint}_")
+        tags = item.get("manual_tags", [])[:4]
+        note = str(item.get("private_note", "") or "").strip()
+        if tags:
+            lines.append(f"     _tags:_ {', '.join(tags)}")
+        if note:
+            lines.append(f"     _nota:_ {note[:120]}")
 
     if not lines:
         lines.append("  ▸ Você ainda não confirmou conexões sociais.")
@@ -562,6 +627,9 @@ def format_mutual_social_matches(history: list[dict], profile_url: str = "") -> 
             f"  ▸ *{item.get('nickname', 'Viajante')}* · score {item.get('score', 0)} · vista {item.get('seen_count', 0)}x"
         )
         lines.append(f"     _{room_hint}_")
+        tags = item.get("manual_tags", [])[:4]
+        if tags:
+            lines.append(f"     _tags:_ {', '.join(tags)}")
 
     if not lines:
         lines.append("  ▸ Você ainda não tem conexões mútuas.")

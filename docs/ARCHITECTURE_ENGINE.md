@@ -17,6 +17,15 @@ Sobre os artifacts base, o projeto agora mantém uma camada derivada para aproxi
 * **Pool de imagens por sala:** a base de prompts e assets visuais é preparada em `mudai.world.rooms.{slug}.images.*`, permitindo cache, rotação e regeneração futura.
 * **Memória curta anti-repetição:** respostas recentes podem ser registradas em `mudai.world.memory.responses.*` para evitar repetição textual excessiva.
 
+### 1.2. Estado Vivo das Salas (`server/world_state.py`)
+Cada sala pode acumular estado persistente próprio fora do markdown original.
+* **Artifacts de estado:** o backend cria e atualiza `mudai.world.rooms.{slug}.state`, além de blocos, imagens e missões relacionados.
+* **Resumo evolutivo:** contribuições dos jogadores alimentam `evolving_summary`, `visual_summary`, `motifs`, destaques recentes e a necessidade de renovar imagens da sala.
+* **Missões locais:** salas podem gerar missões persistentes baseadas no propósito e nos motivos recentes, oferecendo desafios leves sem depender de frontend.
+* **Logs persistentes:** eventos relevantes entram em `game_log`, permitindo refletir no estado vivo da sala e em leituras futuras.
+* **Consequências persistentes:** o estado também acumula `momentum_score`, `social_heat`, `challenge_completion_count`, `last_consequence_type` e `last_consequence_summary`, reagindo a novos blocos, conclusões de missão e marcos sociais disparados no engine.
+* **Objetivo:** fazer cada ambiente ganhar memória própria e parecer um lugar em transformação contínua.
+
 ### 2. Game Engine e Parser (`server/game_engine.py`)
 É o cérebro que analisa o que o usuário enviou, extrai as sementes (economia) do perfil e roteia para:
 * Achar o jogador.
@@ -62,7 +71,9 @@ O backend também cruza o que cada jogador busca com o que outros jogadores ofer
 * **Memória persistida:** cada consulta pode registrar artifacts em `mudai.users.{phone}.social_matches.{other_phone}` com score, termos em comum e contagem de vezes em que aquela conexão foi sugerida.
 * **Consulta histórica:** o backend também permite revisar essa memória social via `/historico-conexoes` e aliases equivalentes, ordenando conexões por recência e recorrência.
 * **Curadoria social:** conexões persistidas podem ser marcadas como favoritas, úteis e confirmadas via `/favoritar-conexao`, `/marcar-conexao-util` e `/confirmar-conexao`, com revisões dedicadas em `/conexoes-favoritas`, `/conexoes-uteis` e `/conexoes-confirmadas`, preservando esse estado entre novas consultas.
+* **Memória enriquecida:** cada conexão persistida também pode receber nota privada e tags manuais via `/anotar-conexao NOME :: nota` e `/taguear-conexao NOME :: tag1, tag2`, exibidas nas listagens sociais relevantes.
 * **Reciprocidade bilateral:** quando dois jogadores confirmam a conexão nos dois sentidos, o backend sincroniza o estado mútuo nos dois artifacts e expõe esse vínculo via `/conexoes-mutuas`.
+* **Progressão por relações:** ações sociais relevantes atualizam `relationship_progress` no metadata do jogador, liberando pequenas recompensas em sementes e badges quando marcos como primeira confirmação, primeira conexão mútua ou curadoria social são atingidos.
 * **Objetivo:** incentivar conversas, trocas e afinidades reais usando os dados já coletados no onboarding e no perfil do jogador.
 
 ---

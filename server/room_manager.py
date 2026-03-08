@@ -113,8 +113,8 @@ def get_room_info(room_path: str) -> Optional[dict]:
         purpose=meta.get("purpose", ""),
         tags=meta.get("tags", []),
     )
-    state_meta = state.get("metadata_parsed", {})
     snapshot = world_state.room_dynamic_snapshot(room_path)
+    state_meta = snapshot.get("state", state.get("metadata_parsed", {}))
 
     info = {
         "path": room_path,
@@ -132,6 +132,10 @@ def get_room_info(room_path: str) -> Optional[dict]:
         "evolving_summary": state_meta.get("evolving_summary", ""),
         "visual_summary": state_meta.get("visual_summary", ""),
         "motifs": state_meta.get("motifs", []),
+        "momentum_score": int(state_meta.get("momentum_score", 0) or 0),
+        "social_heat": int(state_meta.get("social_heat", 0) or 0),
+        "last_consequence_type": state_meta.get("last_consequence_type", ""),
+        "last_consequence_summary": state_meta.get("last_consequence_summary", ""),
         "recent_contributions": snapshot.get("highlight", []),
         "image": snapshot.get("image"),
         "missions": snapshot.get("missions", []),
@@ -173,15 +177,17 @@ def find_social_matches(phone: str, limit: int = 5) -> list[dict]:
         offer_matches = sorted(offers_terms.intersection(other_seeks))
         signal_overlap = _score_profile_signal_affinity(player_signals, other_meta.get("profile_signals", {}))
         signal_complement = _score_profile_signal_complementarity(player_signals, other_meta.get("profile_signals", {}))
-        score = len(seek_matches) * 3 + len(offer_matches) * 2
-        score += signal_overlap.get("score_bonus", 0)
-        score += signal_complement.get("score_bonus", 0)
+        match_score = len(seek_matches) * 3 + len(offer_matches) * 2
+        match_score += signal_overlap.get("score_bonus", 0)
+        match_score += signal_complement.get("score_bonus", 0)
         if other_meta.get("current_room") == current_room and current_room:
-            score += 2
-        if score <= 0:
+            match_score += 2
+        if match_score <= 0:
             continue
 
         persisted = persisted_by_phone.get(other["path"].split(".")[-1], {})
+        relationship_score = _calculate_social_relationship_score(persisted)
+        score = match_score + relationship_score
 
         candidates.append({
             "phone": other["path"].split(".")[-1],
@@ -193,6 +199,8 @@ def find_social_matches(phone: str, limit: int = 5) -> list[dict]:
             "signal_score_bonus": signal_overlap.get("score_bonus", 0),
             "complementary_signals": signal_complement.get("complementary_signals", []),
             "complementarity_score_bonus": signal_complement.get("score_bonus", 0),
+            "match_score": match_score,
+            "relationship_score": relationship_score,
             "score": score,
             "same_room": other_meta.get("current_room") == current_room and bool(current_room),
             "seen_count": int(persisted.get("seen_count", 0) or 0),
@@ -238,6 +246,8 @@ def persist_social_matches(phone: str, matches: list[dict]) -> list[dict]:
             "signal_score_bonus": match.get("signal_score_bonus", 0),
             "complementary_signals": match.get("complementary_signals", []),
             "complementarity_score_bonus": match.get("complementarity_score_bonus", 0),
+            "match_score": match.get("match_score", match.get("score", 0)),
+            "relationship_score": match.get("relationship_score", 0),
             "seen_count": seen_count,
             "is_favorite": bool(existing_meta.get("is_favorite", False)),
             "favorited_at": existing_meta.get("favorited_at", ""),
@@ -245,8 +255,12 @@ def persist_social_matches(phone: str, matches: list[dict]) -> list[dict]:
             "marked_useful_at": existing_meta.get("marked_useful_at", ""),
             "is_confirmed": bool(existing_meta.get("is_confirmed", False)),
             "confirmed_at": existing_meta.get("confirmed_at", ""),
+            "private_note": str(existing_meta.get("private_note", "") or "").strip(),
+            "note_updated_at": existing_meta.get("note_updated_at", ""),
+            "manual_tags": _normalize_manual_tags(existing_meta.get("manual_tags", [])),
             "is_mutual": is_mutual,
             "mutual_confirmed_at": mutual_confirmed_at,
+            "ranking_version": 2,
             "first_seen_at": existing_meta.get("first_seen_at") or db._now(),
             "last_seen_at": db._now(),
         }
@@ -265,6 +279,8 @@ def persist_social_matches(phone: str, matches: list[dict]) -> list[dict]:
             "is_favorite": artifact.get("metadata_parsed", {}).get("is_favorite", False),
             "is_useful": artifact.get("metadata_parsed", {}).get("is_useful", False),
             "is_confirmed": artifact.get("metadata_parsed", {}).get("is_confirmed", False),
+            "private_note": artifact.get("metadata_parsed", {}).get("private_note", ""),
+            "manual_tags": artifact.get("metadata_parsed", {}).get("manual_tags", []),
             "is_mutual": artifact.get("metadata_parsed", {}).get("is_mutual", False),
         })
 
@@ -297,12 +313,17 @@ def list_social_match_history(phone: str, limit: int = 10) -> list[dict]:
             "signal_score_bonus": int(meta.get("signal_score_bonus", 0) or 0),
             "complementary_signals": meta.get("complementary_signals", []),
             "complementarity_score_bonus": int(meta.get("complementarity_score_bonus", 0) or 0),
+            "match_score": int(meta.get("match_score", meta.get("score", 0)) or 0),
+            "relationship_score": int(meta.get("relationship_score", 0) or 0),
             "is_favorite": bool(meta.get("is_favorite", False)),
             "favorited_at": meta.get("favorited_at", ""),
             "is_useful": bool(meta.get("is_useful", False)),
             "marked_useful_at": meta.get("marked_useful_at", ""),
             "is_confirmed": bool(meta.get("is_confirmed", False)),
             "confirmed_at": meta.get("confirmed_at", ""),
+            "private_note": str(meta.get("private_note", "") or "").strip(),
+            "note_updated_at": meta.get("note_updated_at", ""),
+            "manual_tags": _normalize_manual_tags(meta.get("manual_tags", [])),
             "is_mutual": bool(meta.get("is_mutual", False)),
             "mutual_confirmed_at": meta.get("mutual_confirmed_at", ""),
             "first_seen_at": meta.get("first_seen_at", ""),
@@ -316,6 +337,52 @@ def list_social_match_history(phone: str, limit: int = 10) -> list[dict]:
 def _get_reverse_social_match_meta(clean_phone: str, other_phone: str) -> dict:
     reverse = db.get_artifact(_social_match_path(other_phone, clean_phone))
     return reverse.get("metadata_parsed", {}) if reverse else {}
+
+
+def _normalize_manual_tags(tags: list[str] | str | None) -> list[str]:
+    if isinstance(tags, str):
+        raw_tags = re.split(r"[,;\n]", tags)
+    elif isinstance(tags, list):
+        raw_tags = tags
+    else:
+        raw_tags = []
+
+    normalized = []
+    seen = set()
+    for tag in raw_tags:
+        clean = str(tag or "").strip().lower()
+        if not clean:
+            continue
+        clean = re.sub(r"\s+", "-", clean)
+        clean = re.sub(r"[^a-z0-9\-_à-ÿ]", "", clean)
+        if not clean or clean in seen:
+            continue
+        seen.add(clean)
+        normalized.append(clean[:32])
+    return normalized[:8]
+
+
+def _calculate_social_relationship_score(meta: dict) -> int:
+    if not meta:
+        return 0
+
+    score = 0
+    seen_count = int(meta.get("seen_count", 0) or 0)
+    score += min(4, seen_count)
+    if meta.get("is_favorite"):
+        score += 5
+    if meta.get("is_useful"):
+        score += 4
+    if meta.get("is_confirmed"):
+        score += 6
+    if meta.get("is_mutual"):
+        score += 8
+    if str(meta.get("private_note", "") or "").strip():
+        score += 2
+    score += min(3, len(_normalize_manual_tags(meta.get("manual_tags", []))))
+    if str(meta.get("last_seen_at", "") or ""):
+        score += 1
+    return score
 
 
 def _find_social_match_artifact(clean_phone: str, query: str) -> Optional[dict]:
@@ -370,6 +437,53 @@ def mark_social_match_useful(phone: str, query: str) -> Optional[dict]:
     meta = target_artifact.get("metadata_parsed", {}).copy()
     meta["is_useful"] = True
     meta["marked_useful_at"] = meta.get("marked_useful_at") or db._now()
+    updated = db.put_artifact(
+        path=target_artifact["path"],
+        content=target_artifact["content"],
+        content_type=target_artifact.get("content_type", "text/plain"),
+        metadata=meta,
+        is_template=False,
+        template_source=target_artifact.get("template_source"),
+    )
+    return updated.get("metadata_parsed", {})
+
+
+def save_social_match_private_note(phone: str, query: str, note: str) -> Optional[dict]:
+    clean = _clean_phone(phone)
+    player = db.get_artifact(f"mudai.users.{clean}")
+    if not player:
+        return None
+
+    target_artifact = _find_social_match_artifact(clean, query)
+    if not target_artifact:
+        return None
+
+    meta = target_artifact.get("metadata_parsed", {}).copy()
+    meta["private_note"] = str(note or "").strip()[:280]
+    meta["note_updated_at"] = db._now()
+    updated = db.put_artifact(
+        path=target_artifact["path"],
+        content=target_artifact["content"],
+        content_type=target_artifact.get("content_type", "text/plain"),
+        metadata=meta,
+        is_template=False,
+        template_source=target_artifact.get("template_source"),
+    )
+    return updated.get("metadata_parsed", {})
+
+
+def save_social_match_tags(phone: str, query: str, tags: list[str] | str) -> Optional[dict]:
+    clean = _clean_phone(phone)
+    player = db.get_artifact(f"mudai.users.{clean}")
+    if not player:
+        return None
+
+    target_artifact = _find_social_match_artifact(clean, query)
+    if not target_artifact:
+        return None
+
+    meta = target_artifact.get("metadata_parsed", {}).copy()
+    meta["manual_tags"] = _normalize_manual_tags(tags)
     updated = db.put_artifact(
         path=target_artifact["path"],
         content=target_artifact["content"],
@@ -471,6 +585,27 @@ def list_mutual_social_matches(phone: str, limit: int = 10) -> list[dict]:
     mutual = [item for item in history if item.get("is_mutual")]
     mutual.sort(key=lambda item: (item.get("mutual_confirmed_at", ""), item.get("confirmed_at", ""), item.get("last_seen_at", "")), reverse=True)
     return mutual[:limit]
+
+
+def get_social_relationship_progress(phone: str) -> dict:
+    history = list_social_match_history(phone, limit=500)
+    noted = [item for item in history if str(item.get("private_note", "") or "").strip()]
+    tagged = [item for item in history if _normalize_manual_tags(item.get("manual_tags", []))]
+    favorites = [item for item in history if item.get("is_favorite")]
+    useful = [item for item in history if item.get("is_useful")]
+    confirmed = [item for item in history if item.get("is_confirmed")]
+    mutual = [item for item in history if item.get("is_mutual")]
+    strongest_score = max([int(item.get("relationship_score", 0) or 0) for item in history], default=0)
+    return {
+        "total_connections": len(history),
+        "favorites": len(favorites),
+        "useful": len(useful),
+        "confirmed": len(confirmed),
+        "mutual": len(mutual),
+        "noted": len(noted),
+        "tagged": len(tagged),
+        "strongest_relationship_score": strongest_score,
+    }
 
 
 def find_room_by_name(name: str) -> Optional[str]:

@@ -55,6 +55,11 @@ def ensure_room_state(room_path: str, room_name: str = "", purpose: str = "", ta
         "image_pool_size": 0,
         "image_refresh_needed": True,
         "last_refresh_reason": "bootstrap",
+        "momentum_score": 0,
+        "social_heat": 0,
+        "challenge_completion_count": 0,
+        "last_consequence_type": "bootstrap",
+        "last_consequence_summary": "",
     }
     return db.put_artifact(path=path, content=room_name or room_path, metadata=metadata)
 
@@ -150,7 +155,15 @@ def complete_room_mission(room_path: str, mission_id: str, player_phone: str, pl
     meta["times_completed"] = int(meta.get("times_completed", 0)) + 1
     meta["last_completed_by"] = player_name
     meta["last_completed_by_hash"] = hashlib.sha256(player_phone.encode()).hexdigest()[:16] if player_phone else ""
-    return db.put_artifact(path=mission["path"], content=mission["content"], metadata=meta)
+    updated = db.put_artifact(path=mission["path"], content=mission["content"], metadata=meta)
+    apply_room_consequence(
+        room_path=room_path,
+        consequence_type="mission_completion",
+        summary=f"{player_name} concluiu uma missão desta sala.",
+        intensity=2,
+        social_delta=1,
+    )
+    return updated
 
 
 def record_room_block(
@@ -186,7 +199,14 @@ def record_room_block(
         "type": "block"
     }
     _add_to_game_log(room_path, log_entry)
-    
+    apply_room_consequence(
+        room_path=room_path,
+        consequence_type=block_type,
+        summary=f"{author_name} alterou o clima da sala com um novo eco.",
+        intensity=max(1, int(metadata.get("impact_score", 1) or 1)),
+        social_delta=1 if block_type in {"mission_response", "challenge_response"} else 0,
+    )
+
     _refresh_room_state(room_path)
     return block
 
@@ -288,6 +308,26 @@ def room_dynamic_snapshot(room_path: str) -> dict:
 
 def refresh_room_state(room_path: str) -> dict:
     return _refresh_room_state(room_path)
+
+
+def apply_room_consequence(
+    room_path: str,
+    consequence_type: str,
+    summary: str,
+    intensity: int = 1,
+    social_delta: int = 0,
+) -> dict:
+    state = ensure_room_state(room_path)
+    meta = state.get("metadata_parsed", {}) if state else {}
+    momentum = int(meta.get("momentum_score", 0) or 0) + max(1, int(intensity or 1))
+    social_heat = int(meta.get("social_heat", 0) or 0) + max(0, int(social_delta or 0))
+    if consequence_type == "mission_completion":
+        meta["challenge_completion_count"] = int(meta.get("challenge_completion_count", 0) or 0) + 1
+    meta["momentum_score"] = momentum
+    meta["social_heat"] = social_heat
+    meta["last_consequence_type"] = str(consequence_type or "world_event")[:40]
+    meta["last_consequence_summary"] = normalize_text(summary)[:220]
+    return db.put_artifact(path=state["path"], content=state["content"], metadata=meta)
 
 
 def normalize_text(text: str) -> str:
@@ -399,6 +439,7 @@ def _refresh_room_state(room_path: str) -> dict:
         "active_missions": mission_meta,
         "mission_count": len(mission_meta),
         "image_refresh_needed": should_refresh_images(state_meta, blocks, visual_summary),
+        "momentum_score": max(int(state_meta.get("momentum_score", 0) or 0), len(blocks)),
     })
 
     return db.put_artifact(path=state["path"], content=summary or state["content"], metadata=state_meta)
