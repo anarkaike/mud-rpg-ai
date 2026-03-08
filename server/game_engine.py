@@ -183,6 +183,8 @@ async def process_action(phone: str, message: str) -> str:
                 return await _handle_look(phone, meta)
             case "profile":
                 return _handle_profile(phone, meta)
+            case "social_mutual":
+                return _handle_mutual_social_matches(phone, meta)
             case "social_confirmed":
                 return _handle_confirmed_social_matches(phone, meta)
             case "confirm_social_match":
@@ -227,6 +229,12 @@ async def _handle_slash_command(phone: str, msg: str) -> str:
             return _handle_reset(phone)
         case "/ajuda" | "/help":
             return _handle_help()
+        case "/conexoes-mutuas" | "/conexões-mútuas" | "/mutuas-sociais" | "/mútuas-sociais":
+            clean = _clean_phone(phone)
+            player = db.get_artifact(f"mudai.users.{clean}")
+            if not player:
+                return fmt.format_error("Você ainda não tem perfil. Envie 'oi' para começar!")
+            return _handle_mutual_social_matches(phone, player.get("metadata_parsed", {}))
         case "/conexoes-confirmadas" | "/conexões-confirmadas" | "/confirmadas-sociais":
             clean = _clean_phone(phone)
             player = db.get_artifact(f"mudai.users.{clean}")
@@ -301,6 +309,7 @@ async def _handle_slash_command(phone: str, msg: str) -> str:
                 "Comandos disponíveis:\n"
                 "  /ajuda — ver ajuda\n"
                 "  /conexoes — ver conexões sugeridas\n"
+                "  /conexoes-mutuas — ver vínculos recíprocos\n"
                 "  /confirmar-conexao NOME — confirmar vínculo\n"
                 "  /conexoes-confirmadas — ver confirmadas\n"
                 "  /marcar-conexao-util NOME — salvar conexão útil\n"
@@ -564,6 +573,11 @@ def _handle_social_matches(phone: str, meta: dict) -> str:
 def _handle_social_match_history(phone: str, meta: dict) -> str:
     history = rooms.list_social_match_history(phone, limit=8)
     return fmt.format_social_match_history(history, profile_url=_generate_profile_url(phone))
+
+
+def _handle_mutual_social_matches(phone: str, meta: dict) -> str:
+    mutual = rooms.list_mutual_social_matches(phone, limit=8)
+    return fmt.format_mutual_social_matches(mutual, profile_url=_generate_profile_url(phone))
 
 
 def _handle_confirm_social_match(phone: str, meta: dict, target: str) -> str:
@@ -910,6 +924,10 @@ async def _parse_action(message: str) -> dict:
         "look": {"action": "look", "target": ""},
         "perfil": {"action": "profile", "target": ""},
         "eu": {"action": "profile", "target": ""},
+        "conexoes mutuas": {"action": "social_mutual", "target": ""},
+        "conexões mútuas": {"action": "social_mutual", "target": ""},
+        "mutuas sociais": {"action": "social_mutual", "target": ""},
+        "mútuas sociais": {"action": "social_mutual", "target": ""},
         "conexoes confirmadas": {"action": "social_confirmed", "target": ""},
         "conexões confirmadas": {"action": "social_confirmed", "target": ""},
         "confirmadas sociais": {"action": "social_confirmed", "target": ""},
@@ -957,6 +975,10 @@ async def _parse_action(message: str) -> dict:
     match_keywords = ["conex", "compat", "match", "quem pode me ajudar", "com quem posso falar"]
     if any(kw in msg for kw in match_keywords):
         return {"action": "matches", "target": ""}
+
+    mutual_keywords = ["conexoes mutuas", "conexões mútuas", "mutuas sociais", "mútuas sociais"]
+    if any(kw in msg for kw in mutual_keywords):
+        return {"action": "social_mutual", "target": ""}
 
     confirmed_keywords = ["conexoes confirmadas", "conexões confirmadas", "confirmadas sociais"]
     if any(kw in msg for kw in confirmed_keywords):

@@ -218,7 +218,13 @@ def persist_social_matches(phone: str, matches: list[dict]) -> list[dict]:
         path = _social_match_path(clean, other_phone)
         existing = db.get_artifact(path)
         existing_meta = existing.get("metadata_parsed", {}) if existing else {}
+        reverse_meta = _get_reverse_social_match_meta(clean, other_phone)
         seen_count = int(existing_meta.get("seen_count", 0) or 0) + 1
+        is_mutual = bool(existing_meta.get("is_mutual", False))
+        mutual_confirmed_at = existing_meta.get("mutual_confirmed_at", "")
+        if bool(existing_meta.get("is_confirmed", False)) and bool(reverse_meta.get("is_confirmed", False)):
+            is_mutual = True
+            mutual_confirmed_at = mutual_confirmed_at or reverse_meta.get("confirmed_at", "") or existing_meta.get("confirmed_at", "") or db._now()
         metadata = {
             "owner_phone": clean,
             "other_phone": other_phone,
@@ -239,6 +245,8 @@ def persist_social_matches(phone: str, matches: list[dict]) -> list[dict]:
             "marked_useful_at": existing_meta.get("marked_useful_at", ""),
             "is_confirmed": bool(existing_meta.get("is_confirmed", False)),
             "confirmed_at": existing_meta.get("confirmed_at", ""),
+            "is_mutual": is_mutual,
+            "mutual_confirmed_at": mutual_confirmed_at,
             "first_seen_at": existing_meta.get("first_seen_at") or db._now(),
             "last_seen_at": db._now(),
         }
@@ -257,6 +265,7 @@ def persist_social_matches(phone: str, matches: list[dict]) -> list[dict]:
             "is_favorite": artifact.get("metadata_parsed", {}).get("is_favorite", False),
             "is_useful": artifact.get("metadata_parsed", {}).get("is_useful", False),
             "is_confirmed": artifact.get("metadata_parsed", {}).get("is_confirmed", False),
+            "is_mutual": artifact.get("metadata_parsed", {}).get("is_mutual", False),
         })
 
     return persisted_matches
@@ -294,12 +303,19 @@ def list_social_match_history(phone: str, limit: int = 10) -> list[dict]:
             "marked_useful_at": meta.get("marked_useful_at", ""),
             "is_confirmed": bool(meta.get("is_confirmed", False)),
             "confirmed_at": meta.get("confirmed_at", ""),
+            "is_mutual": bool(meta.get("is_mutual", False)),
+            "mutual_confirmed_at": meta.get("mutual_confirmed_at", ""),
             "first_seen_at": meta.get("first_seen_at", ""),
             "last_seen_at": meta.get("last_seen_at", ""),
         })
 
     history.sort(key=lambda item: (item.get("last_seen_at", ""), item.get("seen_count", 0), item.get("score", 0)), reverse=True)
     return history[:limit]
+
+
+def _get_reverse_social_match_meta(clean_phone: str, other_phone: str) -> dict:
+    reverse = db.get_artifact(_social_match_path(other_phone, clean_phone))
+    return reverse.get("metadata_parsed", {}) if reverse else {}
 
 
 def _find_social_match_artifact(clean_phone: str, query: str) -> Optional[dict]:
@@ -365,6 +381,42 @@ def mark_social_match_useful(phone: str, query: str) -> Optional[dict]:
     return updated.get("metadata_parsed", {})
 
 
+def _sync_mutual_social_match(clean_phone: str, other_phone: str) -> None:
+    own_artifact = db.get_artifact(_social_match_path(clean_phone, other_phone))
+    reverse_artifact = db.get_artifact(_social_match_path(other_phone, clean_phone))
+    if not own_artifact or not reverse_artifact:
+        return
+
+    own_meta = own_artifact.get("metadata_parsed", {}).copy()
+    reverse_meta = reverse_artifact.get("metadata_parsed", {}).copy()
+    is_mutual = bool(own_meta.get("is_confirmed", False)) and bool(reverse_meta.get("is_confirmed", False))
+    mutual_confirmed_at = ""
+    if is_mutual:
+        mutual_confirmed_at = own_meta.get("mutual_confirmed_at") or reverse_meta.get("mutual_confirmed_at") or reverse_meta.get("confirmed_at", "") or own_meta.get("confirmed_at", "") or db._now()
+
+    own_meta["is_mutual"] = is_mutual
+    reverse_meta["is_mutual"] = is_mutual
+    own_meta["mutual_confirmed_at"] = mutual_confirmed_at
+    reverse_meta["mutual_confirmed_at"] = mutual_confirmed_at
+
+    db.put_artifact(
+        path=own_artifact["path"],
+        content=own_artifact["content"],
+        content_type=own_artifact.get("content_type", "text/plain"),
+        metadata=own_meta,
+        is_template=False,
+        template_source=own_artifact.get("template_source"),
+    )
+    db.put_artifact(
+        path=reverse_artifact["path"],
+        content=reverse_artifact["content"],
+        content_type=reverse_artifact.get("content_type", "text/plain"),
+        metadata=reverse_meta,
+        is_template=False,
+        template_source=reverse_artifact.get("template_source"),
+    )
+
+
 def confirm_social_match(phone: str, query: str) -> Optional[dict]:
     clean = _clean_phone(phone)
     player = db.get_artifact(f"mudai.users.{clean}")
@@ -386,6 +438,10 @@ def confirm_social_match(phone: str, query: str) -> Optional[dict]:
         is_template=False,
         template_source=target_artifact.get("template_source"),
     )
+    _sync_mutual_social_match(clean, str(meta.get("other_phone", "")))
+    refreshed = db.get_artifact(target_artifact["path"])
+    if refreshed:
+        return refreshed.get("metadata_parsed", {})
     return updated.get("metadata_parsed", {})
 
 
@@ -408,6 +464,13 @@ def list_confirmed_social_matches(phone: str, limit: int = 10) -> list[dict]:
     confirmed = [item for item in history if item.get("is_confirmed")]
     confirmed.sort(key=lambda item: (item.get("confirmed_at", ""), item.get("last_seen_at", ""), item.get("seen_count", 0)), reverse=True)
     return confirmed[:limit]
+
+
+def list_mutual_social_matches(phone: str, limit: int = 10) -> list[dict]:
+    history = list_social_match_history(phone, limit=100)
+    mutual = [item for item in history if item.get("is_mutual")]
+    mutual.sort(key=lambda item: (item.get("mutual_confirmed_at", ""), item.get("confirmed_at", ""), item.get("last_seen_at", "")), reverse=True)
+    return mutual[:limit]
 
 
 def find_room_by_name(name: str) -> Optional[str]:

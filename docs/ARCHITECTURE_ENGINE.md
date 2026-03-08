@@ -62,6 +62,7 @@ O backend também cruza o que cada jogador busca com o que outros jogadores ofer
 * **Memória persistida:** cada consulta pode registrar artifacts em `mudai.users.{phone}.social_matches.{other_phone}` com score, termos em comum e contagem de vezes em que aquela conexão foi sugerida.
 * **Consulta histórica:** o backend também permite revisar essa memória social via `/historico-conexoes` e aliases equivalentes, ordenando conexões por recência e recorrência.
 * **Curadoria social:** conexões persistidas podem ser marcadas como favoritas, úteis e confirmadas via `/favoritar-conexao`, `/marcar-conexao-util` e `/confirmar-conexao`, com revisões dedicadas em `/conexoes-favoritas`, `/conexoes-uteis` e `/conexoes-confirmadas`, preservando esse estado entre novas consultas.
+* **Reciprocidade bilateral:** quando dois jogadores confirmam a conexão nos dois sentidos, o backend sincroniza o estado mútuo nos dois artifacts e expõe esse vínculo via `/conexoes-mutuas`.
 * **Objetivo:** incentivar conversas, trocas e afinidades reais usando os dados já coletados no onboarding e no perfil do jogador.
 
 ---
