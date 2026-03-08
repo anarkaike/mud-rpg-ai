@@ -51,6 +51,56 @@ ONBOARDING_STEPS = [
 ]
 
 
+AI_ONBOARDING_PROMPT = """Você é CultivIA, a guia do MUD-AI.
+Você está conduzindo o onboarding de um novo jogador. Seu objetivo é fazer as perguntas de forma calorosa, criativa e variada, mantendo o tom casual e direto do jogo.
+
+DADOS DO PASSO:
+- Passo Atual: {step}/5
+- Objetivo: {title}
+- Pergunta Base: {question_base}
+- Apelido do Jogador: {nickname}
+- Respostas Anteriores: {context}
+
+REGRAS:
+- No máximo 3 frases.
+- Varie a forma de perguntar (use metáforas leves, mude a ordem, seja amigável).
+- Não invente novas perguntas, apenas mude a FORMA de fazer a pergunta do objetivo atual.
+- Mantenha a clareza sobre o que o jogador precisa responder.
+- Use no máximo 1 emoji.
+
+Gere apenas o texto da pergunta variada."""
+
+
+async def _generate_ai_question(step: int, title: str, question_base: str, nickname: str, meta: dict) -> str:
+    """Generate a varied onboarding question using AI."""
+    context = ""
+    # Collect answers from previous steps for context
+    fields = ["nickname", "essence", "seeks", "offers"]
+    for f in fields:
+        if meta.get(f):
+            context += f"{f}: {meta[f]}\n"
+
+    prompt = AI_ONBOARDING_PROMPT.format(
+        step=step,
+        title=title,
+        question_base=question_base,
+        nickname=nickname or "viajante",
+        context=context or "Iniciando agora."
+    )
+
+    try:
+        varied_question = await chat_completion(
+            system_prompt=prompt,
+            user_message=f"Gere a pergunta para o passo {step}",
+            temperature=0.8,
+            max_tokens=150
+        )
+        return varied_question.strip()
+    except Exception as e:
+        print(f"⚠️ AI Onboarding variation failed: {e}")
+        return question_base.replace("{nickname}", nickname or "viajante")
+
+
 async def process_onboarding(phone: str, message: str) -> str:
     """
     Process an onboarding step for a player.
@@ -67,6 +117,8 @@ async def process_onboarding(phone: str, message: str) -> str:
     if current_step == 0:
         _update_meta(phone, {"onboarding_step": 1, "state": "onboarding"})
         step_data = ONBOARDING_STEPS[0]
+        
+        # We don't vary the very first nick name question as much to keep it clear
         return fmt.format_onboarding_step(
             step=1,
             total=5,
@@ -108,7 +160,7 @@ async def process_onboarding(phone: str, message: str) -> str:
             _add_fragment_to_room(
                 "mudai.places.start",
                 message.strip(),
-                meta.get("nickname", "Alguém"),
+                updates.get("nickname", meta.get("nickname", "Alguém")),
             )
 
             # Return the first room view
@@ -121,9 +173,16 @@ async def process_onboarding(phone: str, message: str) -> str:
 
         # Get next step data
         next_step_data = ONBOARDING_STEPS[next_step - 1]
-        nickname = meta.get("nickname", updates.get("nickname", ""))
+        nickname = updates.get("nickname", meta.get("nickname", "viajante"))
 
-        question = next_step_data["question"].replace("{nickname}", nickname)
+        # Generate dynamic AI question
+        question = await _generate_ai_question(
+            step=next_step,
+            title=next_step_data["title"],
+            question_base=next_step_data["question"],
+            nickname=nickname,
+            meta={**meta, **updates}
+        )
 
         return fmt.format_onboarding_step(
             step=next_step,

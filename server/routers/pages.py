@@ -49,24 +49,48 @@ async def index_page_no_slash():
     return HTMLResponse(content=_build_index_html())
 
 
+import hashlib
+
+def _clean_phone(phone: str) -> str:
+    return "".join(c for c in phone if c.isalnum())
+
+
+def _find_user_by_token(token: str):
+    """Find a user artifact by its hashed token."""
+    users = db.list_by_prefix("mudai.users.", direct_children_only=True)
+    for user in users:
+        clean = user["path"].split(".")[-1]
+        user_token = hashlib.sha256(f"mudai-{clean}-2026".encode()).hexdigest()[:16]
+        if user_token == token:
+            return user
+    return None
+
+
 @router.get("/p/{path:path}", response_class=HTMLResponse)
 async def render_page(path: str):
     """
     Render an artifact as a public HTML page.
-
-    The path uses dot-notation: /p/mudai.users.junio
-    Use /p/ for the index page.
+    Supports both direct dot-paths and 16-char hashed profile tokens.
     """
-    # Handle empty path (index page)
     if not path or path.strip() == "":
         return HTMLResponse(content=_build_index_html())
 
+    # 1. Try direct path first
     artifact = db.get_artifact(path)
+
+    # 2. If not found and path looks like a 16-char token, search for user
+    if artifact is None and len(path) == 16:
+        artifact = _find_user_by_token(path)
+        if artifact:
+            path = artifact["path"]
+
     if artifact is None:
         raise HTTPException(status_code=404, detail=f"Page not found: {path}")
 
-    # Extract a nice title from the path
+    # Extract a nice title
     title = path.split(".")[-1].replace("-", " ").title()
+    if artifact.get("metadata_parsed", {}).get("nickname"):
+        title = artifact["metadata_parsed"]["nickname"]
 
     html = render_markdown_to_html(
         content=artifact["content"],

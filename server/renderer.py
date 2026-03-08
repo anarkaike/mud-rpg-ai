@@ -15,7 +15,7 @@ def render_markdown_to_html(
     title: str = "MUD-AI",
     path: str = "",
 ) -> str:
-    """Convert markdown content to a full HTML page with dark theme."""
+    """Convert markdown content to a full HTML page with premium design."""
     md = markdown.Markdown(
         extensions=[
             "extra",
@@ -39,7 +39,7 @@ def render_markdown_to_html(
 
 
 def _wrap_in_template(body_html: str, title: str, path: str) -> str:
-    """Wrap HTML body in a complete dark-themed page."""
+    """Wrap HTML body in a premium dark-themed page with glassmorphism."""
     return f"""<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -47,175 +47,217 @@ def _wrap_in_template(body_html: str, title: str, path: str) -> str:
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{title} — MUD-AI</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
         :root {{
-            --bg-primary: #0d1117;
-            --bg-secondary: #161b22;
-            --bg-tertiary: #21262d;
-            --text-primary: #e6edf3;
-            --text-secondary: #8b949e;
-            --text-muted: #484f58;
-            --accent: #58a6ff;
-            --accent-subtle: #1f6feb22;
-            --green: #3fb950;
-            --border: #30363d;
-            --radius: 8px;
+            --bg-deep: #05070a;
+            --bg-card: rgba(22, 27, 34, 0.7);
+            --bg-glass: rgba(30, 41, 59, 0.4);
+            --accent-glow: rgba(56, 189, 248, 0.15);
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent: #38bdf8;
+            --accent-gradient: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
+            --green: #10b981;
+            --border: rgba(51, 65, 85, 0.5);
+            --radius-lg: 20px;
+            --radius-md: 12px;
         }}
 
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
 
         body {{
-            font-family: 'Inter', -apple-system, sans-serif;
-            background: var(--bg-primary);
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-deep);
+            background-image: 
+                radial-gradient(circle at 0% 0%, rgba(56, 189, 248, 0.08) 0, transparent 50%),
+                radial-gradient(circle at 100% 100%, rgba(129, 140, 248, 0.08) 0, transparent 50%);
             color: var(--text-primary);
-            line-height: 1.7;
+            line-height: 1.6;
             min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }}
 
         .container {{
-            max-width: 720px;
-            margin: 0 auto;
-            padding: 2rem 1.5rem;
+            width: 100%;
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 2.5rem;
+            background: var(--bg-card);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
         }}
 
         .breadcrumb {{
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             color: var(--text-muted);
-            margin-bottom: 1.5rem;
+            margin-bottom: 2rem;
             font-family: 'JetBrains Mono', monospace;
-            letter-spacing: 0.02em;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }}
 
         .breadcrumb span {{
-            color: var(--text-secondary);
+            color: var(--accent);
+            font-weight: 500;
         }}
 
-        h1, h2, h3, h4, h5, h6 {{
-            color: var(--text-primary);
-            margin: 1.5em 0 0.5em;
-            font-weight: 600;
-            line-height: 1.3;
+        h1, h2, h3 {{
+            font-weight: 700;
+            letter-spacing: -0.02em;
         }}
 
         h1 {{
-            font-size: 1.8rem;
-            margin-top: 0;
-            padding-bottom: 0.4em;
-            border-bottom: 1px solid var(--border);
+            font-size: 2.5rem;
+            margin-bottom: 2rem;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 0.5rem;
         }}
 
         h2 {{
-            font-size: 1.4rem;
-            margin-top: 2em;
+            font-size: 1.5rem;
+            margin-top: 2.5rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
         }}
 
-        h3 {{ font-size: 1.15rem; }}
+        h2::before {{
+            content: '';
+            display: block;
+            width: 4px;
+            height: 1.2em;
+            background: var(--accent-gradient);
+            border-radius: 2px;
+        }}
 
-        p {{ margin: 0.8em 0; color: var(--text-primary); }}
+        p {{ margin: 1rem 0; color: var(--text-secondary); font-size: 1.05rem; }}
 
         a {{
             color: var(--accent);
             text-decoration: none;
-            border-bottom: 1px solid transparent;
-            transition: border-color 0.2s;
+            transition: all 0.2s;
+            position: relative;
         }}
 
-        a:hover {{ border-color: var(--accent); }}
+        a:hover {{
+            color: #fff;
+            text-shadow: 0 0 10px var(--accent-glow);
+        }}
 
         blockquote {{
-            border-left: 3px solid var(--accent);
-            margin: 1.2em 0;
-            padding: 0.8em 1.2em;
-            background: var(--accent-subtle);
-            border-radius: 0 var(--radius) var(--radius) 0;
-            color: var(--text-secondary);
+            margin: 2rem 0;
+            padding: 1.5rem 2rem;
+            background: var(--bg-glass);
+            border-left: 4px solid var(--accent);
+            border-radius: 0 var(--radius-md) var(--radius-md) 0;
+            font-style: italic;
+            font-size: 1.1rem;
+            color: var(--text-primary);
         }}
-
-        blockquote p {{ color: var(--text-secondary); margin: 0.3em 0; }}
 
         code {{
             font-family: 'JetBrains Mono', monospace;
-            font-size: 0.85em;
-            background: var(--bg-tertiary);
-            padding: 0.15em 0.4em;
-            border-radius: 4px;
-            color: var(--green);
+            font-size: 0.9em;
+            background: rgba(15, 23, 42, 0.6);
+            padding: 0.2rem 0.5rem;
+            border-radius: 6px;
+            color: var(--accent);
+            border: 1px solid var(--border);
         }}
 
         pre {{
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 1.2em;
+            background: #0f172a;
+            padding: 1.5rem;
+            border-radius: var(--radius-md);
             overflow-x: auto;
-            margin: 1.2em 0;
+            margin: 1.5rem 0;
+            border: 1px solid var(--border);
         }}
 
         pre code {{
-            background: none;
+            background: transparent;
+            border: none;
             padding: 0;
-            color: var(--text-primary);
+            color: #cbd5e1;
         }}
-
-        table {{
-            width: 100%;
-            border-collapse: collapse;
-            margin: 1.2em 0;
-        }}
-
-        th, td {{
-            padding: 0.6em 0.8em;
-            text-align: left;
-            border: 1px solid var(--border);
-        }}
-
-        th {{
-            background: var(--bg-secondary);
-            font-weight: 600;
-            color: var(--text-primary);
-        }}
-
-        td {{ color: var(--text-secondary); }}
-
-        tr:hover td {{ background: var(--bg-secondary); }}
 
         ul, ol {{
-            margin: 0.8em 0;
-            padding-left: 1.5em;
+            margin: 1.5rem 0;
+            padding-left: 1.5rem;
+            list-style: none;
         }}
 
-        li {{ margin: 0.3em 0; color: var(--text-secondary); }}
+        li {{
+            margin: 0.75rem 0;
+            color: var(--text-secondary);
+            position: relative;
+        }}
+
+        li::before {{
+            content: '→';
+            position: absolute;
+            left: -1.5rem;
+            color: var(--accent);
+            opacity: 0.6;
+        }}
 
         hr {{
             border: none;
             border-top: 1px solid var(--border);
-            margin: 2em 0;
+            margin: 3rem 0;
         }}
 
-        img {{
-            max-width: 100%;
-            border-radius: var(--radius);
+        .badge-list {{
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            margin: 1.5rem 0;
         }}
 
-        em {{ color: var(--text-secondary); }}
-
-        strong {{ color: var(--text-primary); font-weight: 600; }}
+        .badge {{
+            padding: 0.4rem 1rem;
+            background: var(--bg-glass);
+            border: 1px solid var(--border);
+            border-radius: 30px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }}
 
         .footer {{
-            margin-top: 3rem;
-            padding-top: 1.5rem;
-            border-top: 1px solid var(--border);
+            margin-top: auto;
+            padding: 3rem 0;
             text-align: center;
             color: var(--text-muted);
-            font-size: 0.8rem;
+            font-size: 0.9rem;
         }}
 
-        .footer a {{ color: var(--text-secondary); }}
+        .footer a {{
+            font-weight: 500;
+            margin-top: 0.5rem;
+            display: inline-block;
+        }}
 
-        @media (max-width: 600px) {{
-            .container {{ padding: 1rem; }}
-            h1 {{ font-size: 1.4rem; }}
+        @media (max-width: 640px) {{
+            .container {{ margin: 1rem; padding: 1.5rem; }}
+            h1 {{ font-size: 2rem; }}
         }}
     </style>
 </head>
@@ -225,9 +267,10 @@ def _wrap_in_template(body_html: str, title: str, path: str) -> str:
             {_path_to_breadcrumb(path)}
         </div>
         {body_html}
-        <div class="footer">
-            <p>🌱 MUD-AI — <a href="/">mudai.servinder.com.br</a></p>
-        </div>
+    </div>
+    <div class="footer">
+        <p>MUD-AI — Onde palavras tornam-se mundos.</p>
+        <a href="https://mudai.servinder.com.br">mudai.servinder.com.br</a>
     </div>
 </body>
 </html>"""
