@@ -240,7 +240,7 @@ async def process_action(phone: str, message: str) -> str:
     if pending_response:
         return pending_response
 
-    active_challenge = meta.get("active_challenge")
+    active_challenge = _active_challenge_from_meta(meta)
     if active_challenge:
         challenge_response = _resolve_active_challenge(phone, meta, message, active_challenge)
         if challenge_response:
@@ -1862,7 +1862,7 @@ async def _attach_room_challenge(phone: str, meta: dict, room_info: dict | None,
 
 async def _ensure_active_challenge(phone: str, meta: dict, room_info: dict, trigger: str) -> dict | None:
     current_room = room_info.get("path")
-    active = meta.get("active_challenge")
+    active = _active_challenge_from_meta(meta)
     if active and active.get("status") == "active" and active.get("room_path") == current_room:
         if active.get("mission_id"):
             return active
@@ -2128,8 +2128,17 @@ def _challenge_type_label(challenge_type: str) -> str:
     return mapping.get(challenge_type, challenge_type or "desafio")
 
 
+def _active_challenge_from_meta(meta: dict | None) -> dict | None:
+    if not isinstance(meta, dict):
+        return None
+    active = meta.get("active_challenge")
+    if not isinstance(active, dict) or not active.get("id"):
+        return None
+    return _persistable_active_challenge(active)
+
+
 def _persistable_active_challenge(challenge: dict | None) -> dict | None:
-    if not challenge:
+    if not isinstance(challenge, dict) or not challenge:
         return None
     return {
         "id": challenge.get("id", ""),
