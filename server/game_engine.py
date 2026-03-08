@@ -178,6 +178,10 @@ async def process_action(phone: str, message: str) -> str:
                 return await _handle_look(phone, meta)
             case "profile":
                 return _handle_profile(phone, meta)
+            case "social_favorites":
+                return _handle_favorite_social_matches(phone, meta)
+            case "favorite_social_match":
+                return _handle_favorite_social_match(phone, meta, target)
             case "social_history":
                 return _handle_social_match_history(phone, meta)
             case "matches":
@@ -210,6 +214,18 @@ async def _handle_slash_command(phone: str, msg: str) -> str:
             return _handle_reset(phone)
         case "/ajuda" | "/help":
             return _handle_help()
+        case "/conexoes-favoritas" | "/conexões-favoritas" | "/favoritas-sociais":
+            clean = _clean_phone(phone)
+            player = db.get_artifact(f"mudai.users.{clean}")
+            if not player:
+                return fmt.format_error("Você ainda não tem perfil. Envie 'oi' para começar!")
+            return _handle_favorite_social_matches(phone, player.get("metadata_parsed", {}))
+        case "/favoritar-conexao" | "/favoritar-conexão":
+            clean = _clean_phone(phone)
+            player = db.get_artifact(f"mudai.users.{clean}")
+            if not player:
+                return fmt.format_error("Você ainda não tem perfil. Envie 'oi' para começar!")
+            return _handle_favorite_social_match(phone, player.get("metadata_parsed", {}), args)
         case "/historico-conexoes" | "/histórico-conexões" | "/memoria-social" | "/memória-social":
             clean = _clean_phone(phone)
             player = db.get_artifact(f"mudai.users.{clean}")
@@ -248,6 +264,8 @@ async def _handle_slash_command(phone: str, msg: str) -> str:
                 "Comandos disponíveis:\n"
                 "  /ajuda — ver ajuda\n"
                 "  /conexoes — ver conexões sugeridas\n"
+                "  /favoritar-conexao NOME — salvar conexão útil\n"
+                "  /conexoes-favoritas — ver favoritas\n"
                 "  /historico-conexoes — ver memória social\n"
                 "  /sementes — seu saldo\n"
                 "  /perfil — seu personagem\n"
@@ -436,6 +454,20 @@ def _handle_social_matches(phone: str, meta: dict) -> str:
 def _handle_social_match_history(phone: str, meta: dict) -> str:
     history = rooms.list_social_match_history(phone, limit=8)
     return fmt.format_social_match_history(history, profile_url=_generate_profile_url(phone))
+
+
+def _handle_favorite_social_match(phone: str, meta: dict, target: str) -> str:
+    if not (target or "").strip():
+        return fmt.format_error("Use /favoritar-conexao NOME para marcar alguém da sua memória social.")
+    saved = rooms.favorite_social_match(phone, target)
+    if not saved:
+        return fmt.format_error("Não encontrei essa conexão na sua memória social. Veja /historico-conexoes primeiro.")
+    return fmt.format_social_favorite_saved(saved, profile_url=_generate_profile_url(phone))
+
+
+def _handle_favorite_social_matches(phone: str, meta: dict) -> str:
+    favorites = rooms.list_favorite_social_matches(phone, limit=8)
+    return fmt.format_favorite_social_matches(favorites, profile_url=_generate_profile_url(phone))
 
 
 def _handle_explore(phone: str, meta: dict) -> str:
@@ -728,6 +760,9 @@ async def _parse_action(message: str) -> dict:
         "look": {"action": "look", "target": ""},
         "perfil": {"action": "profile", "target": ""},
         "eu": {"action": "profile", "target": ""},
+        "conexoes favoritas": {"action": "social_favorites", "target": ""},
+        "conexões favoritas": {"action": "social_favorites", "target": ""},
+        "favoritas sociais": {"action": "social_favorites", "target": ""},
         "historico conexoes": {"action": "social_history", "target": ""},
         "histórico conexões": {"action": "social_history", "target": ""},
         "memoria social": {"action": "social_history", "target": ""},
@@ -765,6 +800,10 @@ async def _parse_action(message: str) -> dict:
     match_keywords = ["conex", "compat", "match", "quem pode me ajudar", "com quem posso falar"]
     if any(kw in msg for kw in match_keywords):
         return {"action": "matches", "target": ""}
+
+    favorite_keywords = ["conexoes favoritas", "conexões favoritas", "favoritas sociais"]
+    if any(kw in msg for kw in favorite_keywords):
+        return {"action": "social_favorites", "target": ""}
 
     history_keywords = ["historico de conex", "histórico de conex", "memoria social", "memória social"]
     if any(kw in msg for kw in history_keywords):

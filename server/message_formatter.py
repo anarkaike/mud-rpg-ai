@@ -235,19 +235,26 @@ def format_social_matches(matches: list[dict], profile_url: str = "") -> str:
         room = match.get("current_room", "")
         room_label = room.split(".")[-1].replace("_", " ").title() if room else "Em trânsito"
         room_hint = " · mesma sala" if match.get("same_room") else f" · {room_label}"
+        favorite_hint = " ⭐" if match.get("is_favorite") else ""
         if match.get("is_new"):
             state_hint = " · nova"
         elif match.get("seen_count", 0):
             state_hint = f" · vista {match.get('seen_count')}x"
         else:
             state_hint = ""
-        lines.append(f"  ▸ *{match.get('nickname', 'Viajante')}*{room_hint}{state_hint}")
+        lines.append(f"  ▸ *{match.get('nickname', 'Viajante')}*{favorite_hint}{room_hint}{state_hint}")
         seek_matches = match.get("seek_matches", [])[:2]
         offer_matches = match.get("offer_matches", [])[:2]
+        shared_signals = match.get("shared_signals", [])[:2]
+        complementary_signals = match.get("complementary_signals", [])[:2]
         if seek_matches:
             lines.append(f"     _pode te oferecer:_ {', '.join(seek_matches)}")
         if offer_matches:
             lines.append(f"     _pode buscar de você:_ {', '.join(offer_matches)}")
+        if shared_signals:
+            lines.append(f"     _afinidades:_ {', '.join(shared_signals)}")
+        if complementary_signals:
+            lines.append(f"     _te complementa em:_ {', '.join(complementary_signals)}")
 
     if not lines:
         lines.append("  ▸ Ainda não achei conexões fortes com base no seu perfil.")
@@ -341,16 +348,23 @@ def format_social_match_history(history: list[dict], profile_url: str = "") -> s
         room = item.get("current_room", "")
         room_label = room.split(".")[-1].replace("_", " ").title() if room else "Em trânsito"
         room_hint = "mesma sala" if item.get("same_room") else room_label
+        favorite_hint = " ⭐" if item.get("is_favorite") else ""
         lines.append(
-            f"  ▸ *{item.get('nickname', 'Viajante')}* · score {item.get('score', 0)} · vista {item.get('seen_count', 0)}x"
+            f"  ▸ *{item.get('nickname', 'Viajante')}*{favorite_hint} · score {item.get('score', 0)} · vista {item.get('seen_count', 0)}x"
         )
         lines.append(f"     _{room_hint}_")
         seek_matches = item.get("seek_matches", [])[:2]
         offer_matches = item.get("offer_matches", [])[:2]
+        shared_signals = item.get("shared_signals", [])[:2]
+        complementary_signals = item.get("complementary_signals", [])[:2]
         if seek_matches:
             lines.append(f"     _te oferece:_ {', '.join(seek_matches)}")
         if offer_matches:
             lines.append(f"     _busca de você:_ {', '.join(offer_matches)}")
+        if shared_signals:
+            lines.append(f"     _afinidades:_ {', '.join(shared_signals)}")
+        if complementary_signals:
+            lines.append(f"     _te complementa em:_ {', '.join(complementary_signals)}")
 
     if not lines:
         lines.append("  ▸ Você ainda não tem histórico de conexões persistido.")
@@ -371,6 +385,53 @@ def format_social_match_history(history: list[dict], profile_url: str = "") -> s
     if profile_url:
         parts.append(f"\n🔗 {profile_url}")
 
+    parts.append(SEP)
+    return "\n".join(parts)
+
+
+def format_social_favorite_saved(match_meta: dict, profile_url: str = "") -> str:
+    nickname = match_meta.get("nickname", "Viajante")
+    parts = [
+        SEP,
+        "⭐ *CONEXÃO FAVORITADA*",
+        SEP,
+        "",
+        f"Você marcou *{nickname}* como uma conexão útil.",
+        "",
+        "💬 _Use /conexoes-favoritas para revisar seus vínculos prioritários._",
+    ]
+    if profile_url:
+        parts.append(f"\n🔗 {profile_url}")
+    parts.append(SEP)
+    return "\n".join(parts)
+
+
+def format_favorite_social_matches(history: list[dict], profile_url: str = "") -> str:
+    lines = []
+    for item in history[:8]:
+        room = item.get("current_room", "")
+        room_label = room.split(".")[-1].replace("_", " ").title() if room else "Em trânsito"
+        room_hint = "mesma sala" if item.get("same_room") else room_label
+        lines.append(
+            f"  ▸ *{item.get('nickname', 'Viajante')}* · score {item.get('score', 0)} · vista {item.get('seen_count', 0)}x"
+        )
+        lines.append(f"     _{room_hint}_")
+
+    if not lines:
+        lines.append("  ▸ Você ainda não marcou conexões favoritas.")
+        lines.append("     _Use /favoritar-conexao NOME depois de ver /conexoes ou /historico-conexoes._")
+
+    parts = [
+        SEP,
+        "⭐ *CONEXÕES FAVORITAS*",
+        SEP,
+        "",
+        "Seus vínculos sociais priorizados:",
+        "",
+        "\n".join(lines),
+    ]
+    if profile_url:
+        parts.append(f"\n🔗 {profile_url}")
     parts.append(SEP)
     return "\n".join(parts)
 

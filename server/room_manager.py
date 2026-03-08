@@ -31,6 +31,7 @@ def get_rooms_for_player(phone: str) -> list[dict]:
     meta = player.get("metadata_parsed", {})
     player_level = meta.get("level", 1)
     player_interests = meta.get("interests", [])
+    player_signals = meta.get("profile_signals", {})
     opted_in_adult = meta.get("opted_in_adult", False)
 
     # Get all place artifacts
@@ -69,7 +70,12 @@ def get_rooms_for_player(phone: str) -> list[dict]:
                     continue
 
         # Calculate relevance score
-        relevance = _calculate_relevance(player_interests, tags)
+        relevance = _calculate_relevance(
+            player_interests,
+            tags,
+            player_signals=player_signals,
+            room_purpose=room_meta.get("purpose", ""),
+        )
 
         # Bump rooms the player hasn't visited
         rooms_visited = meta.get("rooms_visited", [])
@@ -140,6 +146,7 @@ def find_social_matches(phone: str, limit: int = 5) -> list[dict]:
     meta = player.get("metadata_parsed", {})
     seeks_terms = _tokenize_match_text(meta.get("seeks", ""))
     offers_terms = _tokenize_match_text(meta.get("offers", ""))
+    player_signals = meta.get("profile_signals", {})
     current_room = meta.get("current_room", "")
     persisted_by_phone = {
         artifact["metadata_parsed"].get("other_phone"): artifact.get("metadata_parsed", {})
@@ -162,7 +169,11 @@ def find_social_matches(phone: str, limit: int = 5) -> list[dict]:
 
         seek_matches = sorted(seeks_terms.intersection(other_offers))
         offer_matches = sorted(offers_terms.intersection(other_seeks))
+        signal_overlap = _score_profile_signal_affinity(player_signals, other_meta.get("profile_signals", {}))
+        signal_complement = _score_profile_signal_complementarity(player_signals, other_meta.get("profile_signals", {}))
         score = len(seek_matches) * 3 + len(offer_matches) * 2
+        score += signal_overlap.get("score_bonus", 0)
+        score += signal_complement.get("score_bonus", 0)
         if other_meta.get("current_room") == current_room and current_room:
             score += 2
         if score <= 0:
@@ -176,6 +187,10 @@ def find_social_matches(phone: str, limit: int = 5) -> list[dict]:
             "current_room": other_meta.get("current_room", ""),
             "seek_matches": seek_matches,
             "offer_matches": offer_matches,
+            "shared_signals": signal_overlap.get("shared_signals", []),
+            "signal_score_bonus": signal_overlap.get("score_bonus", 0),
+            "complementary_signals": signal_complement.get("complementary_signals", []),
+            "complementarity_score_bonus": signal_complement.get("score_bonus", 0),
             "score": score,
             "same_room": other_meta.get("current_room") == current_room and bool(current_room),
             "seen_count": int(persisted.get("seen_count", 0) or 0),
@@ -211,7 +226,13 @@ def persist_social_matches(phone: str, matches: list[dict]) -> list[dict]:
             "current_room": match.get("current_room", ""),
             "seek_matches": match.get("seek_matches", []),
             "offer_matches": match.get("offer_matches", []),
+            "shared_signals": match.get("shared_signals", []),
+            "signal_score_bonus": match.get("signal_score_bonus", 0),
+            "complementary_signals": match.get("complementary_signals", []),
+            "complementarity_score_bonus": match.get("complementarity_score_bonus", 0),
             "seen_count": seen_count,
+            "is_favorite": bool(existing_meta.get("is_favorite", False)),
+            "favorited_at": existing_meta.get("favorited_at", ""),
             "first_seen_at": existing_meta.get("first_seen_at") or db._now(),
             "last_seen_at": db._now(),
         }
@@ -227,6 +248,7 @@ def persist_social_matches(phone: str, matches: list[dict]) -> list[dict]:
             "seen_count": artifact.get("metadata_parsed", {}).get("seen_count", seen_count),
             "last_seen_at": artifact.get("metadata_parsed", {}).get("last_seen_at", ""),
             "is_new": seen_count == 1,
+            "is_favorite": artifact.get("metadata_parsed", {}).get("is_favorite", False),
         })
 
     return persisted_matches
@@ -254,12 +276,62 @@ def list_social_match_history(phone: str, limit: int = 10) -> list[dict]:
             "current_room": meta.get("current_room", ""),
             "seek_matches": meta.get("seek_matches", []),
             "offer_matches": meta.get("offer_matches", []),
+            "shared_signals": meta.get("shared_signals", []),
+            "signal_score_bonus": int(meta.get("signal_score_bonus", 0) or 0),
+            "complementary_signals": meta.get("complementary_signals", []),
+            "complementarity_score_bonus": int(meta.get("complementarity_score_bonus", 0) or 0),
+            "is_favorite": bool(meta.get("is_favorite", False)),
+            "favorited_at": meta.get("favorited_at", ""),
             "first_seen_at": meta.get("first_seen_at", ""),
             "last_seen_at": meta.get("last_seen_at", ""),
         })
 
     history.sort(key=lambda item: (item.get("last_seen_at", ""), item.get("seen_count", 0), item.get("score", 0)), reverse=True)
     return history[:limit]
+
+
+def favorite_social_match(phone: str, query: str) -> Optional[dict]:
+    clean = _clean_phone(phone)
+    player = db.get_artifact(f"mudai.users.{clean}")
+    if not player:
+        return None
+
+    normalized_query = (query or "").strip().lower()
+    if not normalized_query:
+        return None
+
+    artifacts = db.list_by_prefix(_social_matches_prefix(clean), direct_children_only=True)
+    target_artifact = None
+    for artifact in artifacts:
+        meta = artifact.get("metadata_parsed", {})
+        other_phone = str(meta.get("other_phone", "")).lower()
+        nickname = str(meta.get("nickname", "")).lower()
+        if normalized_query == other_phone or normalized_query in nickname:
+            target_artifact = artifact
+            break
+
+    if not target_artifact:
+        return None
+
+    meta = target_artifact.get("metadata_parsed", {}).copy()
+    meta["is_favorite"] = True
+    meta["favorited_at"] = meta.get("favorited_at") or db._now()
+    updated = db.put_artifact(
+        path=target_artifact["path"],
+        content=target_artifact["content"],
+        content_type=target_artifact.get("content_type", "text/plain"),
+        metadata=meta,
+        is_template=False,
+        template_source=target_artifact.get("template_source"),
+    )
+    return updated.get("metadata_parsed", {})
+
+
+def list_favorite_social_matches(phone: str, limit: int = 10) -> list[dict]:
+    history = list_social_match_history(phone, limit=100)
+    favorites = [item for item in history if item.get("is_favorite")]
+    favorites.sort(key=lambda item: (item.get("favorited_at", ""), item.get("last_seen_at", ""), item.get("seen_count", 0)), reverse=True)
+    return favorites[:limit]
 
 
 def find_room_by_name(name: str) -> Optional[str]:
@@ -487,6 +559,78 @@ def _social_match_path(clean_phone: str, other_phone: str) -> str:
     return f"{_social_matches_prefix(clean_phone)}{other_phone}"
 
 
+def _score_profile_signal_affinity(player_signals: dict, other_signals: dict) -> dict:
+    player_top = set(player_signals.get("top", []))
+    other_top = set(other_signals.get("top", []))
+    shared_top = sorted(player_top.intersection(other_top))
+
+    player_normalized = player_signals.get("normalized", {})
+    other_normalized = other_signals.get("normalized", {})
+    shared_weighted = []
+    for signal in sorted(set(player_normalized).intersection(other_normalized)):
+        overlap = min(float(player_normalized.get(signal, 0.0) or 0.0), float(other_normalized.get(signal, 0.0) or 0.0))
+        if overlap >= 0.4:
+            shared_weighted.append((signal, overlap))
+
+    shared_weighted.sort(key=lambda item: (-item[1], item[0]))
+    weighted_names = [signal for signal, _ in shared_weighted[:3]]
+    shared_signals = []
+    for signal in shared_top + weighted_names:
+        if signal not in shared_signals:
+            shared_signals.append(signal)
+
+    score_bonus = len(shared_top)
+    score_bonus += sum(1 for _, overlap in shared_weighted if overlap >= 0.75)
+
+    return {
+        "shared_signals": shared_signals[:3],
+        "score_bonus": score_bonus,
+    }
+
+
+def _score_profile_signal_complementarity(player_signals: dict, other_signals: dict) -> dict:
+    player_normalized = player_signals.get("normalized", {}) if player_signals else {}
+    other_normalized = other_signals.get("normalized", {}) if other_signals else {}
+    if not player_normalized or not other_normalized:
+        return {
+            "complementary_signals": [],
+            "score_bonus": 0,
+        }
+
+    complement_pairs = {
+        "connection": ["technicality", "practicality"],
+        "humanity": ["leadership", "practicality"],
+        "reflection": ["leadership", "technicality"],
+        "creativity": ["practicality", "technicality"],
+        "support": ["leadership", "intensity"],
+        "technicality": ["connection", "creativity", "humanity"],
+        "leadership": ["support", "reflection", "humanity"],
+        "practicality": ["creativity", "connection"],
+        "intensity": ["support", "reflection"],
+    }
+
+    complementary = []
+    score_bonus = 0
+    for player_signal, complements in complement_pairs.items():
+        player_strength = float(player_normalized.get(player_signal, 0.0) or 0.0)
+        if player_strength < 0.6:
+            continue
+        for other_signal in complements:
+            other_strength = float(other_normalized.get(other_signal, 0.0) or 0.0)
+            if other_strength < 0.6:
+                continue
+            label = f"{player_signal}↔{other_signal}"
+            if label not in complementary:
+                complementary.append(label)
+                score_bonus += 1
+            break
+
+    return {
+        "complementary_signals": complementary[:3],
+        "score_bonus": min(score_bonus, 3),
+    }
+
+
 def _tokenize_match_text(text: str) -> set[str]:
     normalized = (text or "").lower()
     normalized = normalized.replace("ç", "c")
@@ -624,12 +768,72 @@ def _create_room_from_exit(current_room_path: str, direction: str, target_name: 
     return room_path
 
 
-def _calculate_relevance(player_interests: list[str], room_tags: list[str]) -> int:
+def _calculate_relevance(
+    player_interests: list[str],
+    room_tags: list[str],
+    player_signals: dict | None = None,
+    room_purpose: str = "",
+) -> int:
     """Score how relevant a room is to a player."""
-    if not player_interests or not room_tags:
-        return 1
-    overlap = set(player_interests).intersection(set(room_tags))
-    return len(overlap) * 3 + 1
+    score = 1
+
+    if player_interests and room_tags:
+        overlap = set(player_interests).intersection(set(room_tags))
+        score += len(overlap) * 3
+
+    signal_bonus = _score_room_signal_affinity(
+        player_signals or {},
+        room_tags,
+        room_purpose,
+    )
+    score += signal_bonus
+    return score
+
+
+def _score_room_signal_affinity(player_signals: dict, room_tags: list[str], room_purpose: str = "") -> int:
+    normalized = player_signals.get("normalized", {}) if player_signals else {}
+    if not normalized:
+        return 0
+
+    room_signal_map = {
+        "technicality": ["tecnologia", "tech", "codigo", "produto", "dados", "ia", "digital", "startup"],
+        "creativity": ["arte", "criatividade", "design", "escrita", "musica", "poesia", "estetica"],
+        "humanity": ["cuidado", "acolhimento", "familia", "relacoes", "comunidade", "ajuda"],
+        "connection": ["troca", "conexao", "relacoes", "comunidade", "conversa", "encontro"],
+        "reflection": ["verdade", "filosofia", "reflexao", "contemplacao", "alma", "sentido"],
+        "intensity": ["intenso", "provocacao", "desejo", "sombra", "tensao"],
+        "support": ["ajuda", "escuta", "apoio", "acolhimento", "cuidado"],
+        "leadership": ["lideranca", "negocios", "estrategia", "empreendedorismo", "direcao"],
+        "practicality": ["negocios", "carreira", "trabalho", "objetivo", "oficio", "execucao"],
+    }
+
+    room_text = " ".join(room_tags + [room_purpose]).lower()
+    replacements = {
+        "ç": "c",
+        "á": "a",
+        "à": "a",
+        "ã": "a",
+        "â": "a",
+        "é": "e",
+        "ê": "e",
+        "í": "i",
+        "ó": "o",
+        "ô": "o",
+        "õ": "o",
+        "ú": "u",
+    }
+    for old, new in replacements.items():
+        room_text = room_text.replace(old, new)
+
+    bonus = 0
+    for signal, keywords in room_signal_map.items():
+        if any(keyword in room_text for keyword in keywords):
+            strength = float(normalized.get(signal, 0.0) or 0.0)
+            if strength >= 0.75:
+                bonus += 2
+            elif strength >= 0.4:
+                bonus += 1
+    return bonus
 
 
 def get_players_in_room(room_path: str) -> list[dict]:
