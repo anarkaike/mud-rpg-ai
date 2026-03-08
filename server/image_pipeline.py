@@ -24,7 +24,11 @@ def _openai_image_model() -> str:
 
 
 def _public_base_url() -> str:
-    return os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
+    for key in ("PUBLIC_BASE_URL", "COOLIFY_URL", "SERVICE_URL_MUDAI_SERVER"):
+        value = os.environ.get(key, "").rstrip("/")
+        if value:
+            return value
+    return ""
 
 
 def _public_image_url(filename: str) -> str:
