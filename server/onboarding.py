@@ -6,6 +6,7 @@ Starts with 50 seeds, awards bonus on completion.
 """
 
 import hashlib
+import re
 
 from . import database as db
 from . import message_formatter as fmt
@@ -639,6 +640,35 @@ def _build_step_data(step: int, phone: str, meta: dict) -> dict:
     }
 
 
+def _looks_like_onboarding_meta_question(message: str) -> bool:
+    text = (message or "").strip().lower()
+    if not text:
+        return False
+    if "?" in text:
+        return True
+    patterns = [
+        "o que é isso", "oque é isso", "que isso", "como funciona", "quem é você", "quem e voce",
+        "que numero", "que número", "que agente", "quem está falando", "quem esta falando",
+        "por que", "pra que", "para que", "como assim", "não entendi", "nao entendi",
+    ]
+    return any(pattern in text for pattern in patterns)
+
+
+def _build_onboarding_meta_response(step_data: dict, nickname: str, message: str) -> tuple[str, str]:
+    text = (message or "").strip().lower()
+    if any(term in text for term in ["que numero", "que número", "quem está falando", "quem esta falando", "que agente", "quem é você", "quem e voce"]):
+        explanation = "Sou o agente do MUD-AI conduzindo seu início aqui. Este número é o canal do jogo."
+    elif any(term in text for term in ["como funciona", "o que é isso", "oque é isso", "que isso", "como assim", "não entendi", "nao entendi"]):
+        explanation = "Estou te guiando por algumas perguntas curtas para montar seu perfil e personalizar melhor sua experiência."
+    else:
+        explanation = "Posso te explicar rapidinho antes de seguir: estou coletando só o essencial para montar seu perfil inicial."
+
+    question = step_data["question"].replace("{nickname}", nickname or "viajante")
+    hint = step_data["hint"].replace("{nickname}", nickname or "viajante")
+    narrative = f"{explanation}\n\nAgora, voltando ao passo atual: {question}"
+    return narrative, hint
+
+
 async def process_onboarding(phone: str, message: str) -> str:
     """
     Process an onboarding step for a player.
@@ -663,6 +693,18 @@ async def process_onboarding(phone: str, message: str) -> str:
         step_data = _get_category_by_key(step_key)
         field = step_data["field"]
         answer = message.strip()
+        rendered_step = _build_step_data(current_step, phone, meta)
+
+        if _looks_like_onboarding_meta_question(answer):
+            nickname = meta.get("nickname", "viajante")
+            narrative, hint = _build_onboarding_meta_response(rendered_step, nickname, answer)
+            return fmt.format_onboarding_step(
+                step=current_step,
+                total=TOTAL_ONBOARDING_STEPS,
+                title=rendered_step["title"],
+                question=narrative,
+                hint=hint,
+            )
 
         # Save the answer
         updates = {field: answer}
