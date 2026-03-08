@@ -1887,7 +1887,7 @@ async def _ensure_active_challenge(phone: str, meta: dict, room_info: dict, trig
     if challenge_id and challenge_id not in seen_ids:
         seen_ids.append(challenge_id)
     _update_meta(phone, {
-        "active_challenge": challenge,
+        "active_challenge": _persistable_active_challenge(challenge),
         "seen_challenge_ids": seen_ids[-40:],
     })
     return challenge
@@ -2128,6 +2128,23 @@ def _challenge_type_label(challenge_type: str) -> str:
     return mapping.get(challenge_type, challenge_type or "desafio")
 
 
+def _persistable_active_challenge(challenge: dict | None) -> dict | None:
+    if not challenge:
+        return None
+    return {
+        "id": challenge.get("id", ""),
+        "mission_id": challenge.get("mission_id"),
+        "room_path": challenge.get("room_path", ""),
+        "room_name": challenge.get("room_name", "Sala"),
+        "title": challenge.get("title", "Desafio"),
+        "type": challenge.get("type", "reflexão"),
+        "instruction": challenge.get("instruction", ""),
+        "reward_seeds": int(challenge.get("reward_seeds", SEEDS_REWARDS["challenge"]) or SEEDS_REWARDS["challenge"]),
+        "status": challenge.get("status", "active"),
+        "novelty_key": challenge.get("novelty_key", challenge.get("id", "")),
+    }
+
+
 def _serialize_room_challenge(challenge_meta: dict, room_info: dict | None = None) -> dict:
     room_name = challenge_meta.get("room_name") or (room_info or {}).get("name", "Sala")
     return {
@@ -2334,7 +2351,7 @@ def _resolve_active_challenge(phone: str, meta: dict, message: str, challenge: d
                 next_id = str(next_challenge.get("id", "") or "")
                 if next_id and next_id not in next_seen_ids:
                     next_seen_ids.append(next_id)
-                updates["active_challenge"] = next_challenge
+                updates["active_challenge"] = _persistable_active_challenge(next_challenge)
                 updates["seen_challenge_ids"] = next_seen_ids[-40:]
         _update_meta(phone, updates)
         suggestions = _get_room_suggestions(room_info, active_challenge=next_challenge) if room_info else [{"cmd": "olhar", "desc": "ver detalhes"}]
