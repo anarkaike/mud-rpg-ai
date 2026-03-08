@@ -80,7 +80,7 @@ async def web_action(
     # But let's use the full renderer logic if possible
     from .pages import _render_artifact_to_html_inner
     
-    html_inner = _render_artifact_to_html_inner(artifact, target_path)
+    html_inner = _render_artifact_to_html_inner(artifact, target_path, session_token=token, player_artifact=player)
     return HTMLResponse(content=html_inner)
 
 
@@ -112,7 +112,7 @@ async def web_sync(token: str):
         artifact = db.get_artifact("mudai.places.start")
 
     from .pages import _render_artifact_to_html_inner
-    html_inner = _render_artifact_to_html_inner(artifact, current_room_path)
+    html_inner = _render_artifact_to_html_inner(artifact, current_room_path, session_token=token, player_artifact=player)
     
     # Calculate hash to check for changes
     content_hash = hashlib.md5(html_inner.encode()).hexdigest()

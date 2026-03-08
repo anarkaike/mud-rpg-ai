@@ -6,6 +6,7 @@ Used by the /p/{path} public endpoint.
 """
 
 import os
+import html
 import markdown
 from typing import Optional
 
@@ -17,6 +18,7 @@ def render_markdown_to_html(
     full_page: bool = True,
     room_state: Optional[dict] = None,
     player_stats: Optional[dict] = None,
+    player_state: Optional[dict] = None,
     players_here: Optional[list[dict]] = None,
 ) -> str:
     """Convert markdown content to HTML page or inner container content."""
@@ -62,6 +64,8 @@ def render_markdown_to_html(
 
     html_body = md.convert(content)
 
+    mission_panel_html = ""
+
     # If we have room state, handle images, gallery and echoes
     if room_state:
         # Check format again
@@ -104,7 +108,57 @@ def render_markdown_to_html(
             echoes_html += '</ul></div>'
             html_body += echoes_html
 
-        # 4. Handle Game Log / System Messages
+        # 4. Handle Missions
+        missions = meta.get("missions", room_state.get("missions", []))
+        if missions:
+            room_progress = {}
+            active_challenge = {}
+            if player_state:
+                current_room_path = player_state.get("current_room") or meta.get("room_path") or ""
+                mission_progress = player_state.get("mission_progress", {})
+                if isinstance(mission_progress, dict):
+                    room_progress = mission_progress.get(current_room_path, {}) if current_room_path else {}
+                active_challenge = player_state.get("active_challenge") or {}
+
+            mission_cards = []
+            for mission in missions[:4]:
+                mission_id = mission.get("id", "")
+                title_text = html.escape(mission.get("title", "Missão"))
+                instruction = html.escape(mission.get("instruction", ""))
+                reward = mission.get("reward_seeds", 0)
+                completions = mission.get("times_completed", 0)
+                progress_meta = room_progress.get(mission_id, {}) if isinstance(room_progress, dict) else {}
+                is_completed = progress_meta.get("status") == "completed"
+                is_active = active_challenge.get("mission_id") == mission_id
+                status_label = "Concluída" if is_completed else "Ativa agora" if is_active else "Disponível"
+                status_class = "completed" if is_completed else "active" if is_active else "available"
+                mission_cards.append(f"""
+                <div class="mission-card {status_class}">
+                    <div class="mission-card-header">
+                        <div class="mission-title">🎯 {title_text}</div>
+                        <div class="mission-status {status_class}">{status_label}</div>
+                    </div>
+                    <div class="mission-instruction">{instruction}</div>
+                    <div class="mission-meta">
+                        <span>🪙 {reward} sementes</span>
+                        <span>🏁 {completions} conclusões</span>
+                    </div>
+                </div>
+                """)
+
+            helper_html = ""
+            if player_state:
+                helper_html = '<div class="mission-helper">Dica: responda no terminal com uma frase autoral para avançar a missão ativa.</div>'
+
+            mission_panel_html = f"""
+            <div id="mission-panel" class="mission-panel">
+                <div class="mission-panel-header">🎯 MISSÕES DA SALA</div>
+                <div class="mission-panel-list">{''.join(mission_cards)}</div>
+                {helper_html}
+            </div>
+            """
+
+        # 5. Handle Game Log / System Messages
         game_log = meta.get("game_log", [])
         if game_log:
             log_entries_html = "".join([
@@ -170,20 +224,29 @@ def render_markdown_to_html(
                 <div class="presence-list">{players_html or '<div class="presence-empty">Apenas você aqui.</div>'}</div>
             </div>
             """
+
+        mission_panel_oob = ""
+        if mission_panel_html:
+            mission_panel_oob = f"""
+            <div id="mission-panel" hx-swap-oob="true" class="mission-panel">
+                {mission_panel_html.split('>', 1)[1].rsplit('</div>', 1)[0]}
+            </div>
+            """
             
         return f"""
         {player_bar_oob}
         {players_sidebar_oob}
+        {mission_panel_oob}
         <div class="breadcrumb">
             {_path_to_breadcrumb(path)}
         </div>
         {html_body}
         """
 
-    return _wrap_in_template(html_body, title, path, player_stats=player_stats, players_here=players_here)
+    return _wrap_in_template(html_body, title, path, player_stats=player_stats, players_here=players_here, mission_panel_html=mission_panel_html)
 
 
-def _wrap_in_template(body_html: str, title: str, path: str, player_stats: Optional[dict] = None, players_here: Optional[list[dict]] = None) -> str:
+def _wrap_in_template(body_html: str, title: str, path: str, player_stats: Optional[dict] = None, players_here: Optional[list[dict]] = None, mission_panel_html: str = "") -> str:
     """Wrap HTML body in a premium dark-themed page with glassmorphism."""
     # Check if we have a session token (16-char path)
     session_token = path if len(path) == 16 else None
@@ -235,6 +298,8 @@ def _wrap_in_template(body_html: str, title: str, path: str, player_stats: Optio
             <div class="presence-list">{players_html or '<div class="presence-empty">Apenas você aqui.</div>'}</div>
         </div>
         """
+
+    mission_sidebar_html = mission_panel_html
 
     terminal_html = ""
     polling_attrs = ""
@@ -585,6 +650,99 @@ def _wrap_in_template(body_html: str, title: str, path: str, player_stats: Optio
             font-style: italic;
         }}
 
+        .mission-panel {{
+            margin: 2rem 0;
+            padding: 1.25rem;
+            background: rgba(15, 23, 42, 0.35);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border);
+        }}
+
+        .mission-panel-header {{
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            letter-spacing: 0.1em;
+            margin-bottom: 1rem;
+        }}
+
+        .mission-panel-list {{
+            display: flex;
+            flex-direction: column;
+            gap: 0.85rem;
+        }}
+
+        .mission-card {{
+            padding: 1rem;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: rgba(2, 6, 23, 0.45);
+        }}
+
+        .mission-card.active {{
+            border-color: var(--accent);
+            box-shadow: 0 0 0 1px var(--accent-glow);
+        }}
+
+        .mission-card.completed {{
+            border-color: rgba(16, 185, 129, 0.45);
+            background: rgba(16, 185, 129, 0.08);
+        }}
+
+        .mission-card-header {{
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 0.5rem;
+            align-items: center;
+        }}
+
+        .mission-title {{
+            font-weight: 600;
+            color: var(--text-primary);
+        }}
+
+        .mission-status {{
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            padding: 0.2rem 0.5rem;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            white-space: nowrap;
+        }}
+
+        .mission-status.active {{
+            color: var(--accent);
+            border-color: rgba(56, 189, 248, 0.35);
+        }}
+
+        .mission-status.completed {{
+            color: var(--green);
+            border-color: rgba(16, 185, 129, 0.35);
+        }}
+
+        .mission-instruction {{
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }}
+
+        .mission-meta {{
+            margin-top: 0.75rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }}
+
+        .mission-helper {{
+            margin-top: 1rem;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }}
+
         /* Game Log / Notifications */
         .game-log {{
             margin: 2rem 0;
@@ -918,6 +1076,7 @@ def _wrap_in_template(body_html: str, title: str, path: str, player_stats: Optio
         <div class="breadcrumb">
             {_path_to_breadcrumb(path)}
         </div>
+        {mission_sidebar_html}
         {body_html}
     </div>
     {terminal_html}

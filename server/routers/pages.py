@@ -68,7 +68,19 @@ def _find_user_by_token(token: str):
     return None
 
 
-def _render_artifact_to_html_inner(artifact: dict, path: str) -> str:
+def _build_player_state(artifact: dict) -> dict:
+    meta = artifact.get("metadata_parsed", {})
+    return {
+        "nickname": meta.get("nickname", "Viajante"),
+        "seeds": meta.get("seeds", 0),
+        "level": meta.get("level", 1),
+        "current_room": meta.get("current_room", ""),
+        "active_challenge": meta.get("active_challenge"),
+        "mission_progress": meta.get("mission_progress", {}),
+    }
+
+
+def _render_artifact_to_html_inner(artifact: dict, path: str, session_token: str | None = None, player_artifact: dict | None = None) -> str:
     """Helper to render an artifact to HTML (inner container only)."""
     # Extract a nice title
     title = path.split(".")[-1].replace("-", " ").title()
@@ -105,14 +117,22 @@ def _render_artifact_to_html_inner(artifact: dict, path: str) -> str:
 
     # Fetch player stats if session token is provided
     player_stats = None
-    if len(path) == 16:
-        artifact = _find_user_by_token(path)
+    player_state = None
+    if player_artifact:
+        player_state = _build_player_state(player_artifact)
+        player_stats = {
+            "nickname": player_state.get("nickname", "Viajante"),
+            "seeds": player_state.get("seeds", 0),
+            "level": player_state.get("level", 1),
+        }
+    elif session_token:
+        artifact = _find_user_by_token(session_token)
         if artifact:
-            meta = artifact.get("metadata_parsed", {})
+            player_state = _build_player_state(artifact)
             player_stats = {
-                "nickname": meta.get("nickname", "Viajante"),
-                "seeds": meta.get("seeds", 0),
-                "level": meta.get("level", 1),
+                "nickname": player_state.get("nickname", "Viajante"),
+                "seeds": player_state.get("seeds", 0),
+                "level": player_state.get("level", 1),
             }
 
     # Fetch players here if this is a room
@@ -127,6 +147,7 @@ def _render_artifact_to_html_inner(artifact: dict, path: str) -> str:
         full_page=False,
         room_state=room_state,
         player_stats=player_stats,
+        player_state=player_state,
         players_here=players_here,
     )
 
@@ -160,14 +181,15 @@ async def render_page(path: str):
 
     # Fetch player stats if session token is provided
     player_stats = None
+    player_state = None
     if len(original_path) == 16:
         user_artifact = _find_user_by_token(original_path)
         if user_artifact:
-            u_meta = user_artifact.get("metadata_parsed", {})
+            player_state = _build_player_state(user_artifact)
             player_stats = {
-                "nickname": u_meta.get("nickname", "Viajante"),
-                "seeds": u_meta.get("seeds", 0),
-                "level": u_meta.get("level", 1),
+                "nickname": player_state.get("nickname", "Viajante"),
+                "seeds": player_state.get("seeds", 0),
+                "level": player_state.get("level", 1),
             }
 
     # For full pages, we want the outer wrapper too
@@ -200,6 +222,7 @@ async def render_page(path: str):
         full_page=True,
         room_state=room_state,
         player_stats=player_stats,
+        player_state=player_state,
         players_here=players_here,
     )
     return HTMLResponse(content=full_html)

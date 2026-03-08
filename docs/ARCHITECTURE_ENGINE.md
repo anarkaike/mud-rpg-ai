@@ -45,6 +45,7 @@ Componente UI central para a interface via **WhatsApp**. A UI do WhatsApp só ac
 ### 6. Public Profiles e Renderer HTML (`server/routers/pages.py` & `server/renderer.py`)
 Como links para páginas extensas ajudam na visualização dos usuários (nem tudo cabe no WhatsApp), temos endpoints públicos (`/p/{token} `). 
 Eles mapeiam um artefato Markdown em HTML nativamente, usando `markdown2` e estilos de **Dark Mode / Glassmorphism** puros via CSS injetado e substituição dinâmica via expressões regulares para os campos do Profile `{nickname}`.
+Quando a navegação ocorre com sessão web ativa, o renderer também projeta o estado vivo da sala em componentes visuais próprios, incluindo painel de missões persistentes, status da missão ativa, progresso já concluído pelo jogador e sincronização parcial via HTMX para manter barras laterais e terminal coerentes após cada ação.
 
 ---
 
