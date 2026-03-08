@@ -34,10 +34,9 @@ class GameActionResponse(BaseModel):
 async def game_action(body: GameActionRequest):
     """
     Process a player action and return a formatted response.
-
-    This is the ONLY endpoint N8N needs to call.
-    It handles everything: onboarding, navigation, AI, formatting.
     """
+    print(f"📥 Received game action: phone={body.phone}, conv_id={body.conversation_id}, acc_id={body.account_id}")
+    
     if not body.phone or not body.message:
         raise HTTPException(status_code=400, detail="phone and message are required")
 
@@ -49,8 +48,8 @@ async def game_action(body: GameActionRequest):
 
         return GameActionResponse(
             response=response_text,
-            conversation_id=body.conversation_id,
-            account_id=body.account_id,
+            conversation_id=body.conversation_id or "",
+            account_id=body.account_id or "1",
         )
 
     except Exception as e:
