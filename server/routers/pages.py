@@ -7,7 +7,7 @@ The AI can generate links like:
 """
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from .. import database as db
 from ..renderer import render_markdown_to_html
@@ -45,9 +45,70 @@ def _build_index_html() -> str:
     return render_markdown_to_html(content=md, title="MUD-AI — Mundo", path="mudai")
 
 
+def _build_landing_html() -> str:
+    total = db.count_artifacts()
+    players = db.count_artifacts("mudai.users.")
+    places = db.count_artifacts("mudai.places.")
+    world = db.count_artifacts("mudai.world.")
+
+    md = f"""# 🎮 MUD-AI — RPG textual mediado por IA
+
+> Jogue um MUD moderno via WhatsApp e Dashboard Web, onde cada mensagem planta uma semente no mundo.
+
+## 📊 Agora mesmo
+- 👤 Jogadores criados: **{players}**
+- 🏠 Salas vivas: **{places}**
+- 🌍 Artefatos de mundo: **{world}**
+- 📦 Registros totais: **{total}**
+
+---
+
+## ✨ O que você pode fazer
+- Explorar salas dinâmicas que mudam com as interações
+- Deixar fragmentos de texto que viram parte da história
+- Ganhar 🪙 sementes por explorar, conversar e criar
+- Ver seu perfil e progresso em um dashboard em tempo real
+
+## 💬 Jogar pelo WhatsApp
+- Adicione o número oficial do MUD-AI
+- Envie "oi" para começar o onboarding
+- Você receberá um link seguro para o seu Dashboard Web
+
+## 🖥 Jogar pela Web
+
+Você pode navegar pelo mundo sem login, só para espiar:
+
+- [Explorar Salas e Jogadores](/p)
+
+Se já recebeu um link com token pelo WhatsApp, é só abrir:
+
+- Cole o link direto no navegador, ou
+- Cole apenas o token abaixo para ir direto ao seu painel.
+
+<form method="get" action="/p" style="margin-top: 1.5rem;">
+  <label for="token">Token de sessão (16 caracteres)</label><br/>
+  <input id="token" name="token" maxlength="16" style="margin-top: 0.25rem; padding: 0.4rem 0.6rem; width: 220px;" />
+  <button type="submit" style="padding: 0.4rem 0.8rem; margin-left: 0.5rem;">Abrir Dashboard</button>
+</form>
+
+---
+
+> MUD-AI é um experimento vivo. Cada resposta da IA é uma hipótese, cada jogador é um autor.
+"""
+    return render_markdown_to_html(content=md, title="MUD-AI — RPG textual", path="landing", full_page=True)
+
+
+@router.get("/", response_class=HTMLResponse, include_in_schema=False)
+async def landing_page():
+    return HTMLResponse(content=_build_landing_html())
+
+
 @router.get("/p", response_class=HTMLResponse, include_in_schema=False)
-async def index_page_no_slash():
-    """Index page without trailing slash."""
+async def index_page_no_slash(token: str | None = None):
+    if token:
+        t = token.strip()
+        if len(t) == 16:
+            return RedirectResponse(url=f"/p/{t}")
     return HTMLResponse(content=_build_index_html())
 
 
