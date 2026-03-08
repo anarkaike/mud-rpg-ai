@@ -307,7 +307,7 @@ def format_welcome() -> str:
         "onde pessoas se conectam de verdade",
         "através de texto e criatividade.",
         "",
-        "Você começa com *50 🪙 sementes**",
+        "Você começa com *50 🪙 sementes*",
         "e pode ganhar mais explorando,",
         "conversando e interagindo!",
         "",
