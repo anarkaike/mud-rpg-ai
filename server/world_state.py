@@ -94,8 +94,33 @@ def record_room_block(
         "used_in_summary": False,
     }
     block = db.put_artifact(path=path, content=clean_content, metadata=metadata)
+    
+    # Add to room game log
+    from datetime import datetime
+    time_str = datetime.now().strftime("%H:%M")
+    log_entry = {
+        "time": time_str,
+        "text": f'<span class="log-accent">{author_name}</span> deixou um eco: "{clean_content[:40]}..."',
+        "type": "block"
+    }
+    _add_to_game_log(room_path, log_entry)
+    
     _refresh_room_state(room_path)
     return block
+
+
+def _add_to_game_log(room_path: str, entry: dict, limit: int = 15):
+    """Add an entry to the room's persistent game log."""
+    state = get_room_state(room_path)
+    if not state:
+        return
+    
+    meta = state.get("metadata_parsed", {})
+    log = meta.get("game_log", [])
+    log.insert(0, entry)
+    meta["game_log"] = log[:limit]
+    
+    db.put_artifact(path=state["path"], content=state["content"], metadata=meta)
 
 
 def ensure_room_image_stub(room_path: str, reason: str = "room evolution") -> dict:
@@ -164,8 +189,16 @@ def room_dynamic_snapshot(room_path: str) -> dict:
     state = ensure_room_state(room_path)
     meta = state.get("metadata_parsed", {})
     image = get_random_room_image(room_path)
+    
+    # Get all images for gallery
+    all_images_artifacts = list_room_images(room_path, limit=12)
+    all_images = [img.get("metadata_parsed", {}) for img in all_images_artifacts]
+    
+    # Enrich meta with gallery
+    enriched_meta = {**meta, "all_images": all_images}
+    
     return {
-        "state": meta,
+        "state": enriched_meta,
         "highlight": meta.get("recent_contributions", [])[:3],
         "image": image.get("metadata_parsed", {}) if image else None,
     }

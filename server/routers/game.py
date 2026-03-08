@@ -114,10 +114,19 @@ async def web_sync(token: str):
     from .pages import _render_artifact_to_html_inner
     html_inner = _render_artifact_to_html_inner(artifact, current_room_path)
     
+    # Calculate hash to check for changes
+    content_hash = hashlib.md5(html_inner.encode()).hexdigest()
+    
+    # Check if the client sent an ETag-like header
+    from fastapi import Request
+    # Note: we need to add Request to the function params if we want to use it
+    # But for now, let's just return the content and let HTMX handle it.
+    # Actually, HTMX 1.9+ supports hx-swap="none" or similar if we return 204.
+    
     # We can add a custom header to indicate sync status
     return HTMLResponse(
         content=html_inner,
-        headers={"X-Sync-Time": str(hashlib.md5(html_inner.encode()).hexdigest())}
+        headers={"X-Sync-Hash": content_hash}
     )
 
 

@@ -62,27 +62,37 @@ def render_markdown_to_html(
 
     html_body = md.convert(content)
 
-    # If we have room state, handle images and echoes
+    # If we have room state, handle images, gallery and echoes
     if room_state:
         # Check format again
         if "state" in room_state and "image" in room_state:
             meta = room_state.get("state", {})
-            image = room_state.get("image")
+            active_image = room_state.get("image")
         else:
             meta = room_state.get("metadata_parsed", {})
-            image = meta.get("image") or room_state.get("image")
+            active_image = meta.get("image") or room_state.get("image")
         
-        # 1. Handle Room Image if ready
-        if image and image.get("status") == "ready" and image.get("url"):
+        # 1. Handle Active Room Image
+        if active_image and active_image.get("status") == "ready" and active_image.get("url"):
             image_html = f"""
             <div class="room-image-container">
-                <img src="{image['url']}" alt="Visual da Sala" class="room-visual">
-                <div class="image-caption">👁️ Visão gerada pela consciência da sala</div>
+                <img src="{active_image['url']}" alt="Visual da Sala" class="room-visual">
+                <div class="image-caption">👁️ Visão atual da sala</div>
             </div>
             """
             html_body = image_html + html_body
 
-        # 2. Handle Recent Echoes
+        # 2. Handle Room Gallery (other images)
+        all_images = meta.get("all_images", []) # We'll need to pass this or fetch it
+        ready_images = [img for img in all_images if img.get("status") == "ready" and img.get("url") != active_image.get("url")]
+        if ready_images:
+            gallery_html = '<div class="room-gallery"><h4>🖼️ Galeria de Memórias</h4><div class="gallery-grid">'
+            for img in ready_images[:4]:
+                gallery_html += f'<img src="{img["url"]}" class="gallery-thumb" onclick="window.open(this.src)">'
+            gallery_html += '</div></div>'
+            html_body += gallery_html
+
+        # 3. Handle Recent Echoes
         recent_contributions = meta.get("recent_contributions", [])
         if recent_contributions:
             echoes_html = '<div class="room-echoes"><h3>🗣️ Ecos Recentes</h3><ul>'
@@ -93,6 +103,21 @@ def render_markdown_to_html(
                     echoes_html += f'<li><strong>{author}:</strong> <em>"{excerpt}"</em></li>'
             echoes_html += '</ul></div>'
             html_body += echoes_html
+
+        # 4. Handle Game Log / System Messages
+        game_log = meta.get("game_log", [])
+        if game_log:
+            log_entries_html = "".join([
+                f'<div class="log-entry"><span class="log-time">{entry.get("time", "")}</span><span class="log-text">{entry.get("text", "")}</span></div>'
+                for entry in game_log[:10]
+            ])
+            log_html = f"""
+            <div class="game-log">
+                <div class="log-header">📜 Crônicas da Sala</div>
+                {log_entries_html}
+            </div>
+            """
+            html_body += log_html
 
     # Try to extract title from frontmatter or first heading
     if hasattr(md, "Meta") and "title" in md.Meta:
@@ -156,8 +181,23 @@ def _wrap_in_template(body_html: str, title: str, path: str, player_stats: Optio
         seeds = player_stats.get("seeds", 0)
         level = player_stats.get("level", 1)
         nickname = player_stats.get("nickname", "Viajante")
+        
+        # Add a script to trigger the animation if seeds changed
+        seeds_script = f"""
+        <script>
+            (function() {{
+                const el = document.querySelector('.player-seeds');
+                if (el && el.innerText.indexOf('{seeds}') === -1) {{
+                    el.classList.add('updated');
+                    setTimeout(() => el.classList.remove('updated'), 1000);
+                }}
+            }})();
+        </script>
+        """
+
         player_bar_html = f"""
         <div id="player-stats-bar" class="player-stats-bar">
+            {seeds_script}
             <div class="player-info">
                 <span class="player-nickname">👤 {nickname}</span>
                 <span class="player-level">⭐ Nv.{level}</span>
@@ -408,6 +448,13 @@ def _wrap_in_template(body_html: str, title: str, path: str, player_stats: Optio
         .player-seeds {{
             color: var(--green);
             font-weight: 500;
+            transition: all 0.5s;
+        }}
+
+        .player-seeds.updated {{
+            color: #fff;
+            text-shadow: 0 0 10px var(--green);
+            transform: scale(1.2);
         }}
 
         /* Room Visuals */
@@ -427,6 +474,47 @@ def _wrap_in_template(body_html: str, title: str, path: str, player_stats: Optio
             object-fit: cover;
             filter: brightness(0.8) contrast(1.1);
             transition: filter 0.3s;
+        }}
+
+        /* Room Gallery */
+        .room-gallery {{
+            margin: 2rem 0;
+            padding: 1.5rem;
+            background: rgba(15, 23, 42, 0.3);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border);
+        }}
+
+        .room-gallery h4 {{
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }}
+
+        .gallery-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 1rem;
+        }}
+
+        .gallery-thumb {{
+            width: 100%;
+            aspect-ratio: 1;
+            object-fit: cover;
+            border-radius: 8px;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            transition: all 0.2s;
+            filter: grayscale(0.5) brightness(0.7);
+        }}
+
+        .gallery-thumb:hover {{
+            filter: grayscale(0) brightness(1);
+            transform: scale(1.05);
+            border-color: var(--accent);
+            box-shadow: 0 0 15px var(--accent-glow);
         }}
 
         /* Presence Sidebar */
@@ -481,6 +569,54 @@ def _wrap_in_template(body_html: str, title: str, path: str, player_stats: Optio
             color: var(--text-muted);
             font-style: italic;
         }}
+
+        /* Game Log / Notifications */
+        .game-log {{
+            margin: 2rem 0;
+            padding: 1.25rem;
+            background: rgba(15, 23, 42, 0.3);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            max-height: 250px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }}
+
+        .log-header {{
+            font-size: 0.65rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.25rem;
+        }}
+
+        .log-entry {{
+            padding: 0.25rem 0.5rem;
+            border-left: 2px solid var(--border);
+            transition: all 0.3s;
+        }}
+
+        .log-entry.new {{
+            background: var(--accent-glow);
+            border-left-color: var(--accent);
+            animation: slideIn 0.3s ease-out;
+        }}
+
+        @keyframes slideIn {{
+            from {{ transform: translateX(-10px); opacity: 0; }}
+            to {{ transform: translateX(0); opacity: 1; }}
+        }}
+
+        .log-time {{ color: var(--text-muted); font-size: 0.75rem; margin-right: 0.5rem; }}
+        .log-text {{ color: var(--text-secondary); }}
+        .log-accent {{ color: var(--accent); font-weight: 500; }}
 
         .room-image-container:hover .room-visual {{
             filter: brightness(1);
