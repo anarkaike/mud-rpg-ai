@@ -2045,6 +2045,17 @@ def _with_skipped_challenge_for_room(meta: dict, room_path: str, challenge_id: s
     }
 
 
+def _recent_skipped_challenge_ids_by_room(meta: dict, room_path: str, cooldown_window: int = 2) -> set[str]:
+    scoped = meta.get("skipped_challenge_ids_by_room", {})
+    if not isinstance(scoped, dict):
+        return set()
+    items = scoped.get(room_path, [])
+    if not isinstance(items, list):
+        return set()
+    recent = [str(item) for item in items if item][-max(0, int(cooldown_window)):]
+    return set(recent)
+
+
 def _is_challenge_rotation_request(normalized: str) -> bool:
     aliases = {
         "pular",
@@ -2225,8 +2236,10 @@ def _select_room_challenge_for_player(room_info: dict, meta: dict, excluded_ids:
     completed_novelty = _completed_challenge_novelty_keys(meta)
     seen_ids = _seen_challenge_ids(meta)
     skipped_ids = _skipped_challenge_ids_by_room(meta, room_path) or _skipped_challenge_ids(meta)
+    cooled_down_ids = _recent_skipped_challenge_ids_by_room(meta, room_path)
     excluded = set(excluded_ids or set())
-    scored = []
+    scored_primary = []
+    scored_fallback = []
     for challenge in challenges:
         challenge_meta = challenge.get("metadata_parsed", {})
         challenge_id = str(challenge_meta.get("id", "") or "")
@@ -2243,7 +2256,9 @@ def _select_room_challenge_for_player(room_info: dict, meta: dict, excluded_ids:
         if challenge_id in skipped_ids:
             score -= 0.45
         score += min(int(challenge_meta.get("response_count", 0) or 0), 4) * 0.02
-        scored.append((score, challenge_meta))
+        bucket = scored_fallback if challenge_id in cooled_down_ids else scored_primary
+        bucket.append((score, challenge_meta))
+    scored = scored_primary or scored_fallback
     if not scored:
         return None
     scored.sort(key=lambda item: item[0], reverse=True)
