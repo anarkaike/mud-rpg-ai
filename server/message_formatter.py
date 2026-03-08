@@ -292,11 +292,12 @@ def format_room_list(
     return "\n".join(parts)
 
 
-def format_welcome() -> str:
+def format_welcome(first_question: str = "", first_hint: str = "") -> str:
     """
     First-time welcome message before onboarding.
+    Includes the first question directly to avoid an extra step.
     """
-    return "\n".join([
+    parts = [
         SEP,
         "🌱 *BEM-VINDO AO MUD-AI*",
         "_Um mundo de texto, conexões e descobertas_",
@@ -310,12 +311,28 @@ def format_welcome() -> str:
         "e pode ganhar mais explorando,",
         "conversando e interagindo!",
         "",
-        "Mas antes, me conta um pouco sobre",
-        "você? São 5 perguntas rápidas. 🎭",
+        DIV,
+        "📋 *CRIANDO SEU PERFIL* (1/5)",
+        DIV,
         "",
-        "💬 _Digite qualquer coisa para começar_",
+    ]
+
+    if first_question:
+        parts.append(first_question)
+    else:
+        parts.append("Antes de tudo, *como quer ser chamado* aqui dentro?")
+        parts.append("\nPode ser um apelido, um nome inventado, ou seu nome real.")
+
+    if first_hint:
+        parts.append(f"\n{first_hint}")
+    else:
+        parts.append("\n✨ _Exemplos: Luna, Eco, seu nome..._")
+
+    parts += [
+        "",
         SEP,
-    ])
+    ]
+    return "\n".join(parts)
 
 
 def format_error(message: str) -> str:

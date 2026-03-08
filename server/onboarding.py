@@ -113,19 +113,10 @@ async def process_onboarding(phone: str, message: str) -> str:
     meta = player.get("metadata_parsed", {})
     current_step = meta.get("onboarding_step", 0)
 
-    # Step 0: Show welcome, advance to step 1
+    # Legacy edge case: step 0 players — upgrade to step 1
     if current_step == 0:
-        _update_meta(phone, {"onboarding_step": 1, "state": "onboarding"})
-        step_data = ONBOARDING_STEPS[0]
-        
-        # We don't vary the very first nick name question as much to keep it clear
-        return fmt.format_onboarding_step(
-            step=1,
-            total=5,
-            title=step_data["title"],
-            question=step_data["question"],
-            hint=step_data["hint"],
-        )
+        _update_meta(phone, {"onboarding_step": 1})
+        current_step = 1
 
     # Steps 1-5: Save answer and advance
     if 1 <= current_step <= 5:
@@ -211,7 +202,8 @@ async def start_onboarding(phone: str) -> str:
         state = meta.get("state", "")
 
         if state == "onboarding":
-            return await process_onboarding(phone, "")
+            # Already in onboarding, show welcome with first question
+            return fmt.format_welcome()
 
         return None
 
@@ -221,7 +213,7 @@ async def start_onboarding(phone: str) -> str:
     # Set initial metadata with 50 seeds
     _update_meta(phone, {
         "state": "onboarding",
-        "onboarding_step": 0,
+        "onboarding_step": 1,
         "current_room": "mudai.places.start",
         "rooms_visited": ["mudai.places.start"],
         "seeds": INITIAL_SEEDS,
